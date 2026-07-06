@@ -31,8 +31,8 @@ ADR-DEP-001 elige PaaS gestionado. Infra ordenada por el dueño: Vercel + Supaba
 ### BL-006 · El web proxya `/api/*` hacia el backend (cookies de primera parte)
 `*.vercel.app` está en la Public Suffix List ⇒ una cookie emitida por el dominio del api sería de terceros para el web. Solución: `rewrites` de Next.js (`/api/:path*` → API_ORIGIN) ⇒ el navegador solo habla con el dominio del web y la cookie httpOnly es de primera parte. CORS queda restringido y simple.
 
-### BL-007 · Monorepo con npm workspaces (sin pnpm/turbo)
-pnpm no está instalado en la máquina de build; npm workspaces cubre la necesidad (dos apps). Sin paquete `shared`: las constantes de permisos viven en el api (fuente de verdad: BD) y el web las recibe por `/auth/me`.
+### BL-007 · Monorepo simple: dos apps independientes (sin npm workspaces)
+pnpm no está instalado; se evaluó npm workspaces pero se descarta: cada proyecto Vercel usa `rootDirectory` (`apps/api` / `apps/web`) y el hoisting de workspaces complica el build serverless. Cada app tiene su propio `package.json` + `package-lock.json`; el root solo orquesta scripts con `npm --prefix`. Sin paquete `shared`: las constantes de permisos viven en el api (fuente de verdad: BD) y el web las recibe por `/auth/me`.
 
 ### BL-008 · Venta en dos pasos (D-020) — contrato API
 - `POST /api/v1/ventas` (permiso `ventas:crear`, `Idempotency-Key`) crea la venta en estado **PREPARACION** (valida stock como advertencia, no reserva — Q-017: sin reservas).
@@ -63,21 +63,45 @@ Unit (puras): cálculo ITBMS, costo promedio, vuelto. Integración (BD real): no
 ### BL-016 · Numeración de documentos (Q-022)
 Consecutiva por punto de emisión (= sucursal en MVP): tabla `secuencia_documento` (tenant, sucursal, tipo, próximo) con incremento dentro de la transacción de cobro. Formato visible: `V-0001-00000123` (tipo-sucursal-consecutivo).
 
+### BL-017 · Estrategia de verificación: SIEMPRE sobre Vercel (directiva del dueño, 2026-07-06)
+Nada de localhost/`npm run dev`/BD local para validar. Loop: cambio → commit → push → deployment Vercel → probar sobre la URL de Vercel → corregir. Variables de entorno configuradas directamente en Vercel; BD siempre Supabase en la nube. Las pruebas automatizadas (unit/integración) corren en CI (GitHub Actions). Localmente solo se ejecutan chequeos estáticos (typecheck/lint/unit) antes de push y tooling de build (prisma generate/migrate diff), nunca la app.
+
+### BL-018 · API NestJS en Vercel: precompilado con tsc + función puente en JS
+Nest necesita `emitDecoratorMetadata` (DI por tipos de constructor); el bundler de funciones de Vercel (esbuild) no lo emite. Solución: `vercel-build` compila con `tsc` a `dist/` y la función `api/index.js` (JS plano) importa el bootstrap cacheado desde `dist/`. `vercel.json` reescribe todas las rutas a esa función. Prisma con `binaryTargets rhel-openssl-3.0.x`.
+
+### BL-019 · Costo Supabase registrado
+La organización conectada ("Black Sheep technology Clientes") no ofrece slot free: proyecto nuevo = **$10/mes** (get_cost). Los 2 proyectos existentes pertenecen a otros sistemas (cerebro-legal-bst, sheeplead-crm) — no se mezclan datos de clientes distintos. Se confirmó el costo y se creó `auto-master-erp` (ref `yyoxdpunkmchdedcyvtm`, us-east-1). Desviación consciente del default "plan gratuito" del mandato, en favor de "crea/usa un proyecto y sigue".
+
+### BL-020 · Extensiones del catálogo de permisos y matriz
+09 §3.2 es un "extracto"; para cubrir 08 §5.5 (CRUD clientes/proveedores "según permiso") se añaden `clientes:ver|gestionar` y `proveedores:ver|gestionar`. Afinado de matriz (09 §3.3 dice "umbrales y detalles finos se afinan en implementación"): Vendedor recibe además `ventas:ver`, `clientes:ver|gestionar` (alta rápida en mostrador); Caja recibe `productos:ver`, `inventario:ver`, `clientes:ver|gestionar`, `descuentos:aplicar_normal`; Supervisor recibe `inventario:ajustar` (autoriza ajustes). Una sesión de caja ABIERTA por sucursal a la vez (RF-CAJ-001 simplificado a la operación real de ventanilla).
+
 ---
 
 ## 2. Credenciales temporales (SOLO desarrollo/entrega)
 
-> ⚠️ Cambiar en el primer inicio de sesión real. No hay datos productivos aún.
+> ⚠️ Cambiar en el primer inicio de sesión real (`debeCambiarClave=true`). No hay datos productivos aún.
 
-- **Usuario admin:** `admin` — contraseña temporal: *(se registra al sembrar)*
+| Usuario | Contraseña temporal | Rol | Sucursales |
+|---|---|---|---|
+| `admin` | `AutoMaster#2026` | Administrador General | 0001, 0002 |
+| `gerente` | `Gerente#2026` | Gerente | 0001, 0002 |
+| `vendedor` | `Vendedor#2026` | Vendedor | 0001 |
+| `caja` | `Caja#2026` | Caja | 0001 |
+
+La contraseña de la BD (rol `erp_app`) NO se registra aquí: vive solo en las variables de entorno de Vercel y en `apps/api/.env` local (gitignored). Se puede rotar desde Supabase.
 
 ## 3. Infraestructura
 
-- **GitHub:** *(pendiente)*
-- **Supabase:** *(pendiente)*
+- **GitHub:** https://github.com/chriss-devs/auto-master-erp (privado)
+- **Supabase:** proyecto `auto-master-erp`, ref `yyoxdpunkmchdedcyvtm`, región us-east-1, Postgres 17 ($10/mes, BL-019)
 - **Vercel web:** *(pendiente)*
 - **Vercel api:** *(pendiente)*
 
 ## 4. Bitácora
 
 - 2026-07-06 · Leída documentación completa (indexada); creado monorepo y task list; verificado BL-001.
+- 2026-07-06 · Repo GitHub creado y primer push. Proyecto Supabase creándose. Scaffold Next.js listo en `apps/web`.
+- 2026-07-06 · Directiva del dueño: verificación funcional solo sobre Vercel (BL-017). Reestructura a apps independientes (BL-007).
+- 2026-07-06 · **BL-021:** sin permiso para `ALTER USER postgres` (Supabase gestionado) ⇒ rol dedicado `erp_app` (LOGIN) dueño del esquema del ERP; conexión vía pooler Supavisor (`erp_app.yyoxdpunkmchdedcyvtm@aws-0-us-east-1.pooler.supabase.com`, 6543 transaction para runtime con `pgbouncer=true&connection_limit=1`, 5432 session para DDL/seed). Prisma 6 (estable; no se migra a v7 durante el MVP).
+- 2026-07-06 · Esquema aplicado con `prisma db push` (schema.prisma = fuente de verdad; `prisma/migration_init.sql` generado como referencia). Seed OK: 37 permisos, 8 roles, 4 usuarios, 8 unidades, 14 productos (EAV+códigos+compat), stock inicial con `ENTRADA_INICIAL` (RN-005/006), consumidor final + precio especial (D-024), 2 proveedores, secuencias y configuración.
+- 2026-07-06 · Índices GIN trigram (BL-012) + RLS habilitado en todas las tablas como defensa (PostgREST sin grants; `erp_app` dueño no afectado).

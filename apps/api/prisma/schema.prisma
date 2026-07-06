@@ -1,0 +1,720 @@
+// ERP Auto Master Colón — Esquema de datos (07-database-design)
+// Multi-tenant-ready (07 §11): tenant_id en entidades de negocio, multiempresa NO activada.
+// Dinero: Decimal (numeric), nunca float (07 §5). Cantidades con decimales por venta fraccionada (D-027).
+// Entidades críticas: soft-delete por estado (RN-183). movimiento_inv y auditoria: append-only (RN-005/182).
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────── Tenant y organización ───────────────────────────────
+
+model Tenant {
+  id          String   @id @default(uuid()) @db.Uuid
+  nombre      String
+  razonSocial String?  @map("razon_social")
+  ruc         String?
+  dv          String?
+  direccion   String?
+  telefono    String?
+  email       String?
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now()) @map("creado_en")
+
+  sucursales Sucursal[]
+  usuarios   Usuario[]
+  roles      Rol[]
+
+  @@map("tenant")
+}
+
+model Sucursal {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  codigo       String // punto de emisión (Q-022): "0001", "0002"
+  nombre       String
+  direccion    String?
+  telefono     String?
+  activa       Boolean @default(true)
+
+  tenant           Tenant             @relation(fields: [tenantId], references: [id])
+  stocks           Stock[]
+  movimientos      MovimientoInv[]
+  ventas           Venta[]
+  facturas         Factura[]
+  cajaSesiones     CajaSesion[]
+  usuarioSucursal  UsuarioSucursal[]
+
+  @@unique([tenantId, codigo])
+  @@map("sucursal")
+}
+
+// ─────────────────────────────── Seguridad: RBAC, sesiones (07 §8, 09 §3) ───────────────────────────────
+
+model Usuario {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  usuario          String // login
+  nombre           String
+  email            String?
+  passwordHash     String    @map("password_hash")
+  activo           Boolean   @default(true)
+  debeCambiarClave Boolean   @default(false) @map("debe_cambiar_clave")
+  intentosFallidos Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta   DateTime? @map("bloqueado_hasta")
+  ultimoLoginEn    DateTime? @map("ultimo_login_en")
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  actualizadoEn    DateTime  @updatedAt @map("actualizado_en")
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  roles       UsuarioRol[]
+  sucursales  UsuarioSucursal[]
+  sesiones    Sesion[]
+
+  @@unique([tenantId, usuario])
+  @@map("usuario")
+}
+
+model Rol {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  codigo      String // admin_general, gerente, supervisor, caja, vendedor, compras, bodega, contabilidad
+  nombre      String
+  descripcion String?
+  esSistema   Boolean @default(false) @map("es_sistema")
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  permisos RolPermiso[]
+  usuarios UsuarioRol[]
+
+  @@unique([tenantId, codigo])
+  @@map("rol")
+}
+
+model Permiso {
+  id          String @id @default(uuid()) @db.Uuid
+  codigo      String @unique // recurso:accion (09 §3.2), p. ej. "ventas:crear"
+  descripcion String
+
+  roles RolPermiso[]
+
+  @@map("permiso")
+}
+
+model RolPermiso {
+  rolId     String @map("rol_id") @db.Uuid
+  permisoId String @map("permiso_id") @db.Uuid
+
+  rol     Rol     @relation(fields: [rolId], references: [id])
+  permiso Permiso @relation(fields: [permisoId], references: [id])
+
+  @@id([rolId, permisoId])
+  @@map("rol_permiso")
+}
+
+model UsuarioRol {
+  usuarioId String @map("usuario_id") @db.Uuid
+  rolId     String @map("rol_id") @db.Uuid
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  rol     Rol     @relation(fields: [rolId], references: [id])
+
+  @@id([usuarioId, rolId])
+  @@map("usuario_rol")
+}
+
+// Alcance por sucursal (RN-181)
+model UsuarioSucursal {
+  usuarioId  String @map("usuario_id") @db.Uuid
+  sucursalId String @map("sucursal_id") @db.Uuid
+
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@id([usuarioId, sucursalId])
+  @@map("usuario_sucursal")
+}
+
+// Sesiones revocables (RN-184, ADR-SEC-001: cookie httpOnly + token opaco)
+model Sesion {
+  id                String    @id @default(uuid()) @db.Uuid
+  usuarioId         String    @map("usuario_id") @db.Uuid
+  tokenHash         String    @unique @map("token_hash") // SHA-256 del token
+  sucursalActivaId  String?   @map("sucursal_activa_id") @db.Uuid // Q-032: una sucursal activa por sesión
+  ip                String?
+  userAgent         String?   @map("user_agent")
+  creadaEn          DateTime  @default(now()) @map("creada_en")
+  expiraEn          DateTime  @map("expira_en")
+  revocadaEn        DateTime? @map("revocada_en")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@map("sesion")
+}
+
+// ─────────────────────────────── Catálogo (07 §3, D-003 EAV híbrido) ───────────────────────────────
+
+enum TipoProducto {
+  FERRETERIA
+  AUTOPARTE
+  GENERAL
+
+  @@map("tipo_producto")
+}
+
+enum ProductoEstado {
+  ACTIVO
+  DESCONTINUADO // RN-023: nunca borrar con movimientos
+
+  @@map("producto_estado")
+}
+
+model Categoria {
+  id       String       @id @default(uuid()) @db.Uuid
+  tenantId String       @map("tenant_id") @db.Uuid
+  padreId  String?      @map("padre_id") @db.Uuid
+  nombre   String
+  tipo     TipoProducto @default(GENERAL)
+  activa   Boolean      @default(true)
+
+  padre     Categoria?    @relation("Subcategorias", fields: [padreId], references: [id])
+  hijas     Categoria[]   @relation("Subcategorias")
+  atributos AtributoDef[]
+  productos Producto[]
+
+  @@index([tenantId])
+  @@map("categoria")
+}
+
+model Marca {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  nombre   String
+  activa   Boolean @default(true)
+
+  productos Producto[]
+
+  @@unique([tenantId, nombre])
+  @@map("marca")
+}
+
+model UnidadMedida {
+  id               String  @id @default(uuid()) @db.Uuid
+  tenantId         String  @map("tenant_id") @db.Uuid
+  codigo           String // UND, M, L, KG, GAL, PAR, JGO, CAJA
+  nombre           String
+  permiteDecimales Boolean @default(false) @map("permite_decimales") // D-027
+
+  productos Producto[]
+
+  @@unique([tenantId, codigo])
+  @@map("unidad_medida")
+}
+
+enum AtributoTipo {
+  TEXTO
+  NUMERO
+  BOOLEANO
+  LISTA
+
+  @@map("atributo_tipo")
+}
+
+// Definición de atributos por categoría (metadatos gobernados — ADR-DB-001 opción D)
+model AtributoDef {
+  id          String       @id @default(uuid()) @db.Uuid
+  tenantId    String       @map("tenant_id") @db.Uuid
+  categoriaId String       @map("categoria_id") @db.Uuid
+  clave       String // slug: "voltaje", "lado", "medida"
+  nombre      String
+  tipo        AtributoTipo @default(TEXTO)
+  unidad      String? // "V", "mm", "amp"
+  opciones    String[]     @default([]) // para tipo LISTA
+  requerido   Boolean      @default(false)
+  orden       Int          @default(0)
+
+  categoria Categoria          @relation(fields: [categoriaId], references: [id])
+  valores   ProductoAtributo[]
+
+  @@unique([categoriaId, clave])
+  @@map("atributo_def")
+}
+
+model Producto {
+  id               String         @id @default(uuid()) @db.Uuid
+  tenantId         String         @map("tenant_id") @db.Uuid
+  sku              String // único e inmutable (RN-022) — se genera desde el código interno (D-028)
+  nombre           String
+  descripcion      String?
+  tipo             TipoProducto   @default(GENERAL)
+  categoriaId      String?        @map("categoria_id") @db.Uuid
+  marcaId          String?        @map("marca_id") @db.Uuid
+  unidadMedidaId   String         @map("unidad_medida_id") @db.Uuid
+  precioBase       Decimal        @map("precio_base") @db.Decimal(12, 2)
+  tasaItbms        Decimal        @default(0.07) @map("tasa_itbms") @db.Decimal(5, 4) // RN-024/042
+  ventaFraccionada Boolean        @default(false) @map("venta_fraccionada") // D-027/RN-025
+  stockMinimo      Decimal        @default(0) @map("stock_minimo") @db.Decimal(12, 3)
+  estado           ProductoEstado @default(ACTIVO)
+  datosExtra       Json?          @map("datos_extra") // JSONB complementario (ADR-DB-001)
+  creadoEn         DateTime       @default(now()) @map("creado_en")
+  actualizadoEn    DateTime       @updatedAt @map("actualizado_en")
+
+  categoria     Categoria?         @relation(fields: [categoriaId], references: [id])
+  marca         Marca?             @relation(fields: [marcaId], references: [id])
+  unidadMedida  UnidadMedida       @relation(fields: [unidadMedidaId], references: [id])
+  codigos       ProductoCodigo[]
+  atributos     ProductoAtributo[]
+  compat        CompatVehiculo[]
+  stocks        Stock[]
+  movimientos   MovimientoInv[]
+  ventaLineas   VentaLinea[]
+  preciosEspeciales PrecioEspecial[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, nombre])
+  @@index([tenantId, estado])
+  @@map("producto")
+}
+
+enum CodigoTipo {
+  INTERNO // código interno actual del negocio (D-028) — prioridad en búsqueda (D-021)
+  BARRA
+  OEM
+  PARTE
+  PROVEEDOR
+  OTRO
+
+  @@map("codigo_tipo")
+}
+
+// Identificadores múltiples (07 §3.2, RN-021)
+model ProductoCodigo {
+  id         String     @id @default(uuid()) @db.Uuid
+  tenantId   String     @map("tenant_id") @db.Uuid
+  productoId String     @map("producto_id") @db.Uuid
+  tipo       CodigoTipo
+  valor      String
+  principal  Boolean    @default(false)
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@unique([tenantId, tipo, valor])
+  @@index([tenantId, valor])
+  @@map("producto_codigo")
+}
+
+// Valores EAV tipados (ADR-DB-001)
+model ProductoAtributo {
+  id            String  @id @default(uuid()) @db.Uuid
+  productoId    String  @map("producto_id") @db.Uuid
+  atributoDefId String  @map("atributo_def_id") @db.Uuid
+  valorTexto    String? @map("valor_texto")
+  valorNumero   Decimal? @map("valor_numero") @db.Decimal(14, 4)
+  valorBool     Boolean? @map("valor_bool")
+
+  producto    Producto    @relation(fields: [productoId], references: [id])
+  atributoDef AtributoDef @relation(fields: [atributoDefId], references: [id])
+
+  @@unique([productoId, atributoDefId])
+  @@index([atributoDefId, valorNumero])
+  @@map("producto_atributo")
+}
+
+// Compatibilidad con vehículos (07 §3.4, Q-033 carga manual)
+model CompatVehiculo {
+  id         String  @id @default(uuid()) @db.Uuid
+  productoId String  @map("producto_id") @db.Uuid
+  marca      String
+  modelo     String
+  anioDesde  Int?    @map("anio_desde")
+  anioHasta  Int?    @map("anio_hasta")
+  motor      String?
+  notas      String?
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@index([productoId])
+  @@map("compat_vehiculo")
+}
+
+// ─────────────────────────────── Inventario (07 §4, D-002, RN-003..009) ───────────────────────────────
+
+// Stock materializado: una fila por (producto, sucursal). Lectura O(1).
+model Stock {
+  productoId    String   @map("producto_id") @db.Uuid
+  sucursalId    String   @map("sucursal_id") @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  cantidad      Decimal  @default(0) @db.Decimal(12, 3)
+  costoPromedio Decimal  @default(0) @map("costo_promedio") @db.Decimal(12, 4) // RN-009 promedio ponderado
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  producto Producto @relation(fields: [productoId], references: [id])
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@id([productoId, sucursalId])
+  @@index([sucursalId])
+  @@map("stock")
+}
+
+enum MovTipo {
+  ENTRADA_COMPRA
+  ENTRADA_INICIAL
+  SALIDA_VENTA
+  AJUSTE_ENTRADA
+  AJUSTE_SALIDA
+  TRANSFER_SALIDA
+  TRANSFER_ENTRADA
+  DEVOLUCION_ENTRADA
+  MERMA
+
+  @@map("mov_tipo")
+}
+
+enum RefTipo {
+  VENTA
+  COMPRA
+  TRANSFERENCIA
+  AJUSTE
+  SEED
+
+  @@map("ref_tipo")
+}
+
+// Histórico append-only e inmutable (RN-005/006): NUNCA update/delete; correcciones = movimientos nuevos.
+model MovimientoInv {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  productoId      String   @map("producto_id") @db.Uuid
+  sucursalId      String   @map("sucursal_id") @db.Uuid
+  tipo            MovTipo
+  cantidad        Decimal  @db.Decimal(12, 3) // siempre > 0; dirección explícita por tipo
+  costoUnitario   Decimal  @map("costo_unitario") @db.Decimal(12, 4)
+  saldoResultante Decimal  @map("saldo_resultante") @db.Decimal(12, 3) // kardex rápido
+  refTipo         RefTipo? @map("ref_tipo")
+  refId           String?  @map("ref_id") @db.Uuid
+  motivo          String?
+  usuarioId       String   @map("usuario_id") @db.Uuid
+  creadoEn        DateTime @default(now()) @map("creado_en")
+
+  producto Producto @relation(fields: [productoId], references: [id])
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@index([productoId, sucursalId, creadoEn])
+  @@index([refTipo, refId])
+  @@index([tenantId, creadoEn])
+  @@map("movimiento_inv")
+}
+
+// ─────────────────────────────── Clientes, proveedores, precios (D-024) ───────────────────────────────
+
+enum ClienteTipo {
+  CONSUMIDOR_FINAL
+  NATURAL
+  JURIDICO
+
+  @@map("cliente_tipo")
+}
+
+model Cliente {
+  id          String      @id @default(uuid()) @db.Uuid
+  tenantId    String      @map("tenant_id") @db.Uuid
+  tipo        ClienteTipo @default(NATURAL)
+  nombre      String
+  rucOCedula  String?     @map("ruc_o_cedula")
+  dv          String?
+  telefono    String?
+  email       String?
+  direccion   String?
+  activo      Boolean     @default(true)
+  creadoEn    DateTime    @default(now()) @map("creado_en")
+  actualizadoEn DateTime  @updatedAt @map("actualizado_en")
+
+  ventas            Venta[]
+  preciosEspeciales PrecioEspecial[]
+
+  @@index([tenantId, nombre])
+  @@map("cliente")
+}
+
+// Precio especial por cliente (D-024, RN-043)
+model PrecioEspecial {
+  id         String  @id @default(uuid()) @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  clienteId  String  @map("cliente_id") @db.Uuid
+  productoId String  @map("producto_id") @db.Uuid
+  precio     Decimal @db.Decimal(12, 2)
+  activo     Boolean @default(true)
+
+  cliente  Cliente  @relation(fields: [clienteId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@unique([clienteId, productoId])
+  @@map("precio_especial")
+}
+
+model Proveedor {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  nombre        String
+  ruc           String?
+  dv            String?
+  telefono      String?
+  email         String?
+  direccion     String?
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  @@index([tenantId, nombre])
+  @@map("proveedor")
+}
+
+// ─────────────────────────────── Ventas (D-020 dos pasos, 07 §5) ───────────────────────────────
+
+enum VentaEstado {
+  PREPARACION // armada por el vendedor en ventanilla
+  COBRADA     // cobrada/facturada/entregada por caja
+  CANCELADA   // soft (RN-183)
+
+  @@map("venta_estado")
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA // datáfono externo: solo registrar (D-032)
+  YAPPY
+  ACH
+
+  @@map("metodo_pago")
+}
+
+model Venta {
+  id                     String      @id @default(uuid()) @db.Uuid
+  tenantId               String      @map("tenant_id") @db.Uuid
+  sucursalId             String      @map("sucursal_id") @db.Uuid
+  numero                 String? // asignado al cobrar: V-0001-00000123 (BL-016)
+  estado                 VentaEstado @default(PREPARACION)
+  clienteId              String      @map("cliente_id") @db.Uuid
+  vendedorId             String      @map("vendedor_id") @db.Uuid
+  cajeroId               String?     @map("cajero_id") @db.Uuid
+  cajaSesionId           String?     @map("caja_sesion_id") @db.Uuid
+  subtotal               Decimal     @default(0) @db.Decimal(12, 2)
+  descuentoTotal         Decimal     @default(0) @map("descuento_total") @db.Decimal(12, 2)
+  itbmsTotal             Decimal     @default(0) @map("itbms_total") @db.Decimal(12, 2)
+  total                  Decimal     @default(0) @db.Decimal(12, 2)
+  efectivoRecibido       Decimal?    @map("efectivo_recibido") @db.Decimal(12, 2)
+  vuelto                 Decimal?    @db.Decimal(12, 2)
+  notas                  String?
+  descuentoAutorizadoPorId String?   @map("descuento_autorizado_por_id") @db.Uuid // RN-160
+  idempotencyKey         String?     @unique @map("idempotency_key")
+  cobroIdempotencyKey    String?     @unique @map("cobro_idempotency_key")
+  cobradaEn              DateTime?   @map("cobrada_en")
+  canceladaEn            DateTime?   @map("cancelada_en")
+  creadoEn               DateTime    @default(now()) @map("creado_en")
+  actualizadoEn          DateTime    @updatedAt @map("actualizado_en")
+
+  sucursal   Sucursal     @relation(fields: [sucursalId], references: [id])
+  cliente    Cliente      @relation(fields: [clienteId], references: [id])
+  lineas     VentaLinea[]
+  pagos      VentaPago[]
+  factura    Factura?
+  cajaMovs   CajaMovimiento[]
+
+  @@unique([tenantId, numero])
+  @@index([tenantId, sucursalId, creadoEn])
+  @@index([tenantId, estado])
+  @@map("venta")
+}
+
+model VentaLinea {
+  id             String  @id @default(uuid()) @db.Uuid
+  ventaId        String  @map("venta_id") @db.Uuid
+  productoId     String  @map("producto_id") @db.Uuid
+  descripcion    String // snapshot del nombre al vender
+  cantidad       Decimal @db.Decimal(12, 3)
+  precioUnitario Decimal @map("precio_unitario") @db.Decimal(12, 2) // ya con precio especial si aplica
+  precioLista    Decimal @map("precio_lista") @db.Decimal(12, 2)
+  descuento      Decimal @default(0) @db.Decimal(12, 2) // monto por línea
+  baseGravable   Decimal @map("base_gravable") @db.Decimal(12, 2)
+  tasaItbms      Decimal @map("tasa_itbms") @db.Decimal(5, 4)
+  itbmsLinea     Decimal @map("itbms_linea") @db.Decimal(12, 2)
+  totalLinea     Decimal @map("total_linea") @db.Decimal(12, 2)
+  costoUnitario  Decimal? @map("costo_unitario") @db.Decimal(12, 4) // fijado al cobrar (utilidad)
+  orden          Int     @default(0)
+
+  venta    Venta    @relation(fields: [ventaId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@index([ventaId])
+  @@map("venta_linea")
+}
+
+model VentaPago {
+  id         String     @id @default(uuid()) @db.Uuid
+  ventaId    String     @map("venta_id") @db.Uuid
+  metodo     MetodoPago
+  monto      Decimal    @db.Decimal(12, 2)
+  referencia String? // voucher datáfono / confirmación Yappy / núm. ACH
+  creadoEn   DateTime   @default(now()) @map("creado_en")
+
+  venta Venta @relation(fields: [ventaId], references: [id])
+
+  @@index([ventaId])
+  @@map("venta_pago")
+}
+
+// ─────────────────────────────── Facturación (D-012, RF-FAC, RN-102/104) ───────────────────────────────
+
+enum FacturaEstado {
+  PENDIENTE_TRANSMISION // contingencia (RF-FAC-005): emitida localmente, falta transmitir al PAC
+  EMITIDA
+  AUTORIZADA
+  RECHAZADA
+  ANULADA
+
+  @@map("factura_estado")
+}
+
+model Factura {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  ventaId       String        @unique @map("venta_id") @db.Uuid
+  sucursalId    String        @map("sucursal_id") @db.Uuid
+  numero        String // F-0001-00000045 por punto de emisión (Q-022)
+  puntoEmision  String        @map("punto_emision")
+  estado        FacturaEstado @default(PENDIENTE_TRANSMISION)
+  cufe          String?
+  urlQr         String?       @map("url_qr")
+  pacProveedor  String        @default("STUB") @map("pac_proveedor")
+  pacRespuesta  Json?         @map("pac_respuesta")
+  snapshot      Json // datos congelados para representación impresa (cliente, líneas, totales)
+  intentos      Int           @default(0)
+  ultimoError   String?       @map("ultimo_error")
+  emitidaEn     DateTime?     @map("emitida_en")
+  autorizadaEn  DateTime?     @map("autorizada_en")
+  creadoEn      DateTime      @default(now()) @map("creado_en")
+  actualizadoEn DateTime      @updatedAt @map("actualizado_en")
+
+  venta    Venta    @relation(fields: [ventaId], references: [id])
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@unique([tenantId, numero])
+  @@index([tenantId, estado])
+  @@map("factura")
+}
+
+// ─────────────────────────────── Caja (RN-120..123, D-039) ───────────────────────────────
+
+enum CajaEstado {
+  ABIERTA
+  CERRADA
+
+  @@map("caja_estado")
+}
+
+enum CajaMovTipo {
+  APERTURA
+  VENTA
+  INGRESO
+  EGRESO
+  RETIRO
+
+  @@map("caja_mov_tipo")
+}
+
+model CajaSesion {
+  id               String     @id @default(uuid()) @db.Uuid
+  tenantId         String     @map("tenant_id") @db.Uuid
+  sucursalId       String     @map("sucursal_id") @db.Uuid
+  estado           CajaEstado @default(ABIERTA)
+  usuarioAperturaId String    @map("usuario_apertura_id") @db.Uuid
+  usuarioCierreId  String?    @map("usuario_cierre_id") @db.Uuid
+  montoInicial     Decimal    @map("monto_inicial") @db.Decimal(12, 2)
+  notasApertura    String?    @map("notas_apertura")
+  notasCierre      String?    @map("notas_cierre")
+  cuadre           Json? // al cierre: por método {esperado, contado, diferencia} (RN-120)
+  descuadreTotal   Decimal?   @map("descuadre_total") @db.Decimal(12, 2)
+  abiertaEn        DateTime   @default(now()) @map("abierta_en")
+  cerradaEn        DateTime?  @map("cerrada_en")
+
+  sucursal    Sucursal         @relation(fields: [sucursalId], references: [id])
+  movimientos CajaMovimiento[]
+
+  @@index([tenantId, sucursalId, estado])
+  @@map("caja_sesion")
+}
+
+model CajaMovimiento {
+  id           String      @id @default(uuid()) @db.Uuid
+  cajaSesionId String      @map("caja_sesion_id") @db.Uuid
+  tipo         CajaMovTipo
+  metodo       MetodoPago?
+  monto        Decimal     @db.Decimal(12, 2) // siempre > 0; dirección por tipo
+  ventaId      String?     @map("venta_id") @db.Uuid
+  motivo       String?
+  usuarioId    String      @map("usuario_id") @db.Uuid
+  creadoEn     DateTime    @default(now()) @map("creado_en")
+
+  cajaSesion CajaSesion @relation(fields: [cajaSesionId], references: [id])
+  venta      Venta?     @relation(fields: [ventaId], references: [id])
+
+  @@index([cajaSesionId])
+  @@map("caja_movimiento")
+}
+
+// ─────────────────────────────── Secuencias, configuración, auditoría ───────────────────────────────
+
+enum DocTipo {
+  VENTA
+  FACTURA
+  NOTA_CREDITO
+
+  @@map("doc_tipo")
+}
+
+// Numeración consecutiva por punto de emisión (Q-022, BL-016)
+model SecuenciaDocumento {
+  tenantId   String  @map("tenant_id") @db.Uuid
+  sucursalId String  @map("sucursal_id") @db.Uuid
+  tipo       DocTipo
+  proximo    Int     @default(1)
+
+  @@id([tenantId, sucursalId, tipo])
+  @@map("secuencia_documento")
+}
+
+model Configuracion {
+  tenantId String @map("tenant_id") @db.Uuid
+  clave    String
+  valor    Json
+
+  @@id([tenantId, clave])
+  @@map("configuracion")
+}
+
+// Append-only (RN-182): nunca se edita ni borra.
+model Auditoria {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  usuarioId      String?  @map("usuario_id") @db.Uuid
+  sucursalId     String?  @map("sucursal_id") @db.Uuid
+  accion         String // "venta.cobrar", "auth.login", "producto.crear"…
+  entidad        String
+  entidadId      String?  @map("entidad_id")
+  estadoAnterior Json?    @map("estado_anterior")
+  estadoNuevo    Json?    @map("estado_nuevo")
+  ip             String?
+  creadoEn       DateTime @default(now()) @map("creado_en")
+
+  @@index([entidad, entidadId, creadoEn])
+  @@index([tenantId, creadoEn])
+  @@map("auditoria")
+}

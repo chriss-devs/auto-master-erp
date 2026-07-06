@@ -2,17 +2,14 @@
   "name": "auto-master-erp",
   "private": true,
   "version": "0.1.0",
-  "description": "ERP Auto Master Colón — MVP (Fase 0 + Fase 1)",
-  "workspaces": [
-    "apps/*"
-  ],
+  "description": "ERP Auto Master Colón — MVP (Fase 0 + Fase 1). Apps independientes: apps/api (NestJS) y apps/web (Next.js).",
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "dev:api": "npm run dev --workspace apps/api",
-    "dev:web": "npm run dev --workspace apps/web"
+    "build": "npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "lint": "npm --prefix apps/api run lint && npm --prefix apps/web run lint",
+    "typecheck": "npm --prefix apps/api run typecheck && npm --prefix apps/web run typecheck",
+    "test": "npm --prefix apps/api run test",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev"
   },
   "engines": {
     "node": ">=20"

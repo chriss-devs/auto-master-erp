@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Entornos y secretos — NUNCA subir
+.env
+.env.*
+!.env.example
+
+# Builds
+dist/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# Vercel
+.vercel/
+
+# Prisma
+apps/api/prisma/*.db
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+scaffold*.log

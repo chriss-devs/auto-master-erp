@@ -1,0 +1,20 @@
+{
+  "name": "auto-master-erp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ERP Auto Master Colón — MVP (Fase 0 + Fase 1)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:api": "npm run dev --workspace apps/api",
+    "dev:web": "npm run dev --workspace apps/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

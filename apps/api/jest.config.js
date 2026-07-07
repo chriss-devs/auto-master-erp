@@ -1,4 +1,4 @@
-/** Unit tests (puras, sin BD): src/**/*.spec.ts */
+// Unit tests (puras, sin BD): src -> *.spec.ts
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',

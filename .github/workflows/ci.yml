@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    name: API (lint + tests + integración + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: erp
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:ci@localhost:5432/erp
+      DIRECT_URL: postgresql://postgres:ci@localhost:5432/erp
+      COOKIE_SECURE: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Unit tests (ITBMS, pagos, cálculo)
+        run: npm test
+      - name: Extensiones de búsqueda
+        run: PGPASSWORD=ci psql -h localhost -U postgres -d erp -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;'
+      - name: Esquema + seed
+        run: |
+          npx prisma db push --skip-generate
+          npm run seed
+      - name: Integración (reglas críticas RN-005/006/007, RBAC, idempotencia, caja)
+        run: npm run test:int
+      - run: npm run build
+
+  web:
+    name: Web (lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build

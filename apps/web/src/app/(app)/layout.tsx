@@ -97,8 +97,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="no-print flex w-52 shrink-0 flex-col border-r border-border bg-surface">
+    <div className="flex h-screen overflow-hidden print:h-auto print:overflow-visible">
+      <aside className="no-print flex h-full w-52 shrink-0 flex-col border-r border-border bg-surface">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-white">AM</div>
           <div className="leading-tight">
@@ -132,8 +132,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="no-print flex items-center justify-between border-b border-border bg-surface px-4 py-2">
+      <div className="flex h-full min-w-0 flex-1 flex-col print:h-auto">
+        <header className="no-print flex shrink-0 items-center justify-between border-b border-border bg-surface px-4 py-2">
           <div className="text-sm text-muted">B/. — moneda local (PAB)</div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted">Sucursal:</span>
@@ -150,7 +150,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </Select>
           </div>
         </header>
-        <main className="min-w-0 flex-1 p-4">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto p-4 print:overflow-visible">{children}</main>
       </div>
 
       {(me.usuario.debeCambiarClave || cambiandoClave) && (

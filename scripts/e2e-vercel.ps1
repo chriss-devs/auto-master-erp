@@ -29,6 +29,8 @@ Write-Host "== Smoke E2E contra $Base =="
 # 0. Web viva
 $html = & curl.exe -s -o "$tmp\home.html" -w '%{http_code}' "$Base/login"
 Check 'Web /login responde 200' ($html -eq '200')
+$raiz = (& curl.exe -s "$Base/") -join ' '
+Check 'Raíz / sirve el ERP (no placeholder de Next)' ($raiz -notmatch 'To get started' -and $raiz -match 'Cargando')
 
 # 1. Salud del API a través del proxy del web (cookie primera parte, BL-006)
 $salud = Llamar "$tmp\anon.txt" GET '/api/v1/health'

@@ -90,12 +90,18 @@ La organización conectada ("Black Sheep technology Clientes") no ofrece slot fr
 
 La contraseña de la BD (rol `erp_app`) NO se registra aquí: vive solo en las variables de entorno de Vercel y en `apps/api/.env` local (gitignored). Se puede rotar desde Supabase.
 
+### BL-022 · Env vars en Vercel: usar `vercel env add NAME production --force --yes --value '<valor>'`
+En esta máquina Windows los pipes de stdin hacia el CLI (`echo … | vercel env add`) guardan valores VACÍOS en silencio (el shim `npx.cmd`/prompt no lee stdin; se diagnosticó con un endpoint de depuración temporal en `/health`). El flag `--value` es la vía no interactiva confiable. Nota: las vars quedan "sensitive" por defecto ⇒ `vercel env pull` las muestra vacías aunque estén bien; la verificación válida es el runtime.
+
+### BL-023 · Mecanismo de despliegue (BL-017)
+Dos proyectos Vercel enlazados por CLI (scope `chriss-devs-projects-797a83d4`): `auto-master-erp-api` (rootDir apps/api) y `auto-master-erp-web` (apps/web). El repo GitHub no está conectado a Vercel (rootDirectory por proyecto requeriría dashboard); el loop es: commit → push (CI GitHub Actions) → `vercel deploy --prod --yes` en cada app → probar sobre la URL de producción. Env vars de producción configuradas en Vercel: api = DATABASE_URL (pooler 6543), DIRECT_URL (pooler 5432), COOKIE_SECURE=true; web = API_ORIGIN.
+
 ## 3. Infraestructura
 
-- **GitHub:** https://github.com/chriss-devs/auto-master-erp (privado)
+- **GitHub:** https://github.com/chriss-devs/auto-master-erp (privado) — CI verde (lint+typecheck+unit+integración con Postgres service+seed+build)
 - **Supabase:** proyecto `auto-master-erp`, ref `yyoxdpunkmchdedcyvtm`, región us-east-1, Postgres 17 ($10/mes, BL-019)
-- **Vercel web:** *(pendiente)*
-- **Vercel api:** *(pendiente)*
+- **Vercel api:** https://auto-master-erp-api.vercel.app (`/api/v1/health` con chequeo de BD)
+- **Vercel web:** https://auto-master-erp-web.vercel.app (proxy `/api/*` → api)
 
 ## 4. Bitácora
 
@@ -105,3 +111,8 @@ La contraseña de la BD (rol `erp_app`) NO se registra aquí: vive solo en las v
 - 2026-07-06 · **BL-021:** sin permiso para `ALTER USER postgres` (Supabase gestionado) ⇒ rol dedicado `erp_app` (LOGIN) dueño del esquema del ERP; conexión vía pooler Supavisor (`erp_app.yyoxdpunkmchdedcyvtm@aws-0-us-east-1.pooler.supabase.com`, 6543 transaction para runtime con `pgbouncer=true&connection_limit=1`, 5432 session para DDL/seed). Prisma 6 (estable; no se migra a v7 durante el MVP).
 - 2026-07-06 · Esquema aplicado con `prisma db push` (schema.prisma = fuente de verdad; `prisma/migration_init.sql` generado como referencia). Seed OK: 37 permisos, 8 roles, 4 usuarios, 8 unidades, 14 productos (EAV+códigos+compat), stock inicial con `ENTRADA_INICIAL` (RN-005/006), consumidor final + precio especial (D-024), 2 proveedores, secuencias y configuración.
 - 2026-07-06 · Índices GIN trigram (BL-012) + RLS habilitado en todas las tablas como defensa (PostgREST sin grants; `erp_app` dueño no afectado).
+- 2026-07-07 · API completo (12 módulos) con typecheck/lint/build verdes. Unit 15/15; integración 11/11 contra Supabase real (RBAC 403, RN-007 sin efectos parciales, cobro atómico, idempotencia, cuadre).
+- 2026-07-07 · API desplegado en Vercel. Depuración de env vars del CLI (BL-022) hasta `db:ok` en producción; login/me verificados en vivo.
+- 2026-07-07 · Frontend Next 16 completo (15 vistas) — nota: Next 16 con Turbopack y regla `react-hooks/set-state-in-effect`; patrón de debounce ajustado. Build verde.
+- 2026-07-08 · Web desplegado (un deploy colgado se mató y se relanzó en foreground). CI de GitHub Actions verde en todos los pushes.
+- 2026-07-08 · **Smoke E2E 15/15 OK contra producción** (`scripts/e2e-vercel.ps1`): login por proxy con cookie de primera parte, RBAC SIN_PERMISO, búsqueda por código interno, venta PREPARACION (ITBMS 7% exacto: 2×7.50 → 16.05), cobro COBRADA `V-0001-…` con vuelto, factura contingencia `F-0001-…` con CUFE `FE-SIM-…`, caja por método, movimiento SALIDA_VENTA inmutable, auditoría `venta.cobrar`, snapshot de impresión carta y dashboard. **Definición de Terminado cumplida.**

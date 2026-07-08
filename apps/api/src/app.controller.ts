@@ -21,7 +21,6 @@ export class AppController {
     } catch {
       db = 'error';
     }
-    const u = process.env.DATABASE_URL;
-    return { estado: 'ok', db, ts: new Date().toISOString(), env_dbg: `${u === undefined ? 'UNSET' : JSON.stringify(u.slice(0, 14))}|len=${u?.length ?? -1}` };
+    return { estado: 'ok', db, ts: new Date().toISOString() };
   }
 }

@@ -14,8 +14,19 @@ ERP a medida para ferretería y autopartes (Colón, Panamá). Monorepo del MVP (
 
 | Entorno | URL |
 |---|---|
-| Web (Vercel) | *(pendiente de despliegue)* |
-| API (Vercel) | *(pendiente de despliegue)* |
+| **Web (Vercel)** | https://auto-master-erp-web.vercel.app |
+| **API (Vercel)** | https://auto-master-erp-api.vercel.app (salud: `/api/v1/health`) |
+| Repo | https://github.com/chriss-devs/auto-master-erp |
+| BD | Supabase `auto-master-erp` (us-east-1, ref `yyoxdpunkmchdedcyvtm`) |
+
+> El web proxya `/api/*` al API (cookies de primera parte). Usuarios demo y contraseñas temporales: `BUILD-LOG.md` §2.
+
+### Desplegar (CLI, tras cada push)
+
+```bash
+cd apps/api && npx vercel deploy --prod --yes
+cd apps/web && npx vercel deploy --prod --yes
+```
 
 ## Desarrollo local
 

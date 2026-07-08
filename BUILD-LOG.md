@@ -83,7 +83,7 @@ La organización conectada ("Black Sheep technology Clientes") no ofrece slot fr
 
 | Usuario | Contraseña temporal | Rol | Sucursales |
 |---|---|---|---|
-| `admin` | `AutoMaster#2026` | Administrador General | 0001, 0002 |
+| `admin` | ~~`AutoMaster#2026`~~ **rotada por el dueño el 2026-07-08** (el cambio forzado del primer login funcionó) | Administrador General | 0001, 0002 |
 | `gerente` | `Gerente#2026` | Gerente | 0001, 0002 |
 | `vendedor` | `Vendedor#2026` | Vendedor | 0001 |
 | `caja` | `Caja#2026` | Caja | 0001 |

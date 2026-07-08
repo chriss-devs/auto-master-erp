@@ -171,6 +171,8 @@ function PreciosEspecialesDialog({
   const [q, setQ] = useState("");
   const [opciones, setOpciones] = useState<Array<{ id: string; sku: string; nombre: string; precioBase: string }>>([]);
   const [precio, setPrecio] = useState("");
+  const [pct, setPct] = useState("");
+  const [lista, setLista] = useState<number>(0);
   const [productoId, setProductoId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -238,7 +240,7 @@ function PreciosEspecialesDialog({
               <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
                 {opciones.map((p) => (
                   <button key={p.id} className="block w-full px-3 py-1.5 text-left text-sm hover:bg-page"
-                    onClick={() => { setProductoId(p.id); setQ(`${p.sku} — ${p.nombre}`); setPrecio(p.precioBase); setOpciones([]); }}>
+                    onClick={() => { setProductoId(p.id); setQ(`${p.sku} — ${p.nombre}`); setPrecio(p.precioBase); setLista(Number(p.precioBase)); setPct(""); setOpciones([]); }}>
                     <span className="mr-2 font-mono text-xs text-muted">{p.sku}</span>{p.nombre}
                     <span className="float-right">{fmtMoney(p.precioBase)}</span>
                   </button>
@@ -246,8 +248,22 @@ function PreciosEspecialesDialog({
               </div>
             )}
           </div>
-          <div className="flex gap-2">
-            <Input inputMode="decimal" placeholder="Precio especial" value={precio} onChange={(e) => setPrecio(e.target.value)} className="w-40" />
+          <div className="flex items-center gap-2">
+            <Input inputMode="decimal" placeholder="Precio especial" value={precio} className="w-36"
+              onChange={(e) => { setPrecio(e.target.value); setPct(""); }} />
+            <span className="text-xs text-muted">ó</span>
+            <Input inputMode="decimal" placeholder="% desc." value={pct} className="w-24"
+              onChange={(e) => {
+                const v = e.target.value;
+                setPct(v);
+                const p = Number(v.replace(",", "."));
+                if (lista > 0 && isFinite(p) && p >= 0 && p < 100) setPrecio((Math.round(lista * (100 - p)) / 100).toFixed(2));
+              }} />
+            {lista > 0 && Number(precio) > 0 && (
+              <span className="text-xs text-muted">
+                lista {fmtMoney(lista)} → {fmtMoney(precio)} ({(100 - (Number(precio) / lista) * 100).toFixed(1)}% desc.)
+              </span>
+            )}
             <Button onClick={() => void agregar()} disabled={!productoId || Number(precio) <= 0}>Guardar</Button>
           </div>
         </div>

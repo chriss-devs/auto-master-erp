@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { fmtFecha, fmtMoney, fmtQty } from "@/lib/format";
 import { useSesion } from "@/lib/session";
@@ -22,11 +23,12 @@ interface Mov {
   sucursal: { codigo: string };
 }
 
-export default function InventarioPage() {
+function InventarioContenido() {
   const { me, sucursalId, puede } = useSesion();
   const { avisar } = useToast();
+  const params = useSearchParams();
   const [q, setQ] = useState("");
-  const [soloBajo, setSoloBajo] = useState(false);
+  const [soloBajo, setSoloBajo] = useState(params.get("bajo") === "1");
   const [filas, setFilas] = useState<FilaStock[] | null>(null);
   const [ajuste, setAjuste] = useState<FilaStock | null>(null);
   const [kardex, setKardex] = useState<{ producto: FilaStock["producto"]; movs: Mov[] } | null>(null);
@@ -141,6 +143,14 @@ export default function InventarioPage() {
         <p className="mt-2 text-xs text-muted">Histórico append-only e inmutable (RN-005/006): las correcciones son movimientos nuevos.</p>
       </Dialogo>
     </div>
+  );
+}
+
+export default function InventarioPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <InventarioContenido />
+    </Suspense>
   );
 }
 

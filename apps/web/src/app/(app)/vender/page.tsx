@@ -31,6 +31,18 @@ interface Cliente {
   tipo: string;
 }
 
+/** Descuento por línea: acepta monto ("1.50") o porcentaje ("10%") del importe bruto. */
+function montoDescuento(raw: string, bruto: number): number {
+  const s = (raw ?? "").trim();
+  if (!s) return 0;
+  if (s.endsWith("%")) {
+    const p = Number(s.slice(0, -1).replace(",", "."));
+    return isFinite(p) && p > 0 ? Math.round(bruto * p) / 100 : 0;
+  }
+  const n = Number(s.replace(",", "."));
+  return isFinite(n) && n > 0 ? n : 0;
+}
+
 export default function VenderPage() {
   const { sucursalId } = useSesion();
   const { avisar } = useToast();
@@ -96,7 +108,7 @@ export default function VenderPage() {
     let subtotal = 0, descuento = 0, itbms = 0;
     for (const l of lineas) {
       const bruto = Math.round(Number(l.producto.precioBase) * Number(l.cantidad || 0) * 100) / 100;
-      const desc = Math.min(Number(l.descuento || 0), bruto);
+      const desc = Math.min(montoDescuento(l.descuento, bruto), bruto);
       const base = bruto - desc;
       subtotal += bruto;
       descuento += desc;
@@ -114,11 +126,15 @@ export default function VenderPage() {
         {
           cuerpo: {
             clienteId: cliente?.id,
-            lineas: lineas.map((l) => ({
-              productoId: l.producto.id,
-              cantidad: l.cantidad,
-              ...(Number(l.descuento) > 0 ? { descuento: Number(l.descuento).toFixed(2) } : {}),
-            })),
+            lineas: lineas.map((l) => {
+              const bruto = Math.round(Number(l.producto.precioBase) * Number(l.cantidad || 0) * 100) / 100;
+              const desc = montoDescuento(l.descuento, bruto);
+              return {
+                productoId: l.producto.id,
+                cantidad: l.cantidad,
+                ...(desc > 0 ? { descuento: desc.toFixed(2) } : {}),
+              };
+            }),
             notas: notas || undefined,
             idempotencyKey: nuevaIdempotencyKey(),
             ...(autorizacion ? { autorizacion } : {}),
@@ -233,7 +249,7 @@ export default function VenderPage() {
           <thead>
             <tr>
               <Th>Producto</Th><Th className="w-24 text-right">Cantidad</Th><Th className="w-28 text-right">Precio</Th>
-              <Th className="w-28 text-right">Desc. B/.</Th><Th className="w-28 text-right">Importe</Th><Th className="w-10"> </Th>
+              <Th className="w-28 text-right">Desc. B/. ó %</Th><Th className="w-28 text-right">Importe</Th><Th className="w-10"> </Th>
             </tr>
           </thead>
           <tbody>
@@ -241,7 +257,8 @@ export default function VenderPage() {
               <tr><Td colSpan={6}><Vacio texto="Busque un producto y presione Enter para agregarlo." /></Td></tr>
             )}
             {lineas.map((l, i) => {
-              const bruto = Number(l.producto.precioBase) * Number(l.cantidad || 0);
+              const bruto = Math.round(Number(l.producto.precioBase) * Number(l.cantidad || 0) * 100) / 100;
+              const descAplicado = Math.min(montoDescuento(l.descuento, bruto), bruto);
               return (
                 <tr key={l.producto.id}>
                   <Td>
@@ -263,16 +280,18 @@ export default function VenderPage() {
                   <Td>
                     <Input
                       className="text-right"
-                      inputMode="decimal"
-                      placeholder="0.00"
+                      placeholder="0.00 ó 5%"
                       value={l.descuento}
                       onChange={(e) => {
                         const v = e.target.value;
                         setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, descuento: v } : x)));
                       }}
                     />
+                    {l.descuento.trim().endsWith("%") && descAplicado > 0 && (
+                      <div className="mt-0.5 text-right text-[10px] text-muted">= {fmtMoney(descAplicado)}</div>
+                    )}
                   </Td>
-                  <Td className="text-right font-medium">{fmtMoney(bruto - Number(l.descuento || 0))}</Td>
+                  <Td className="text-right font-medium">{fmtMoney(bruto - descAplicado)}</Td>
                   <Td>
                     <button className="text-danger hover:underline" onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))}>✕</button>
                   </Td>

@@ -3,10 +3,10 @@
 /** Formulario de producto: EAV por categoría (D-003), códigos múltiples (RN-021),
  *  ITBMS por producto (RN-024/042), venta fraccionada (D-027), stock inicial. */
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSesion } from "@/lib/session";
-import { Badge, Button, Campo, Card, Input, Select, useToast } from "@/components/ui";
+import { Badge, Button, Campo, Card, Dialogo, Input, Label, Select, useToast } from "@/components/ui";
 
 interface AtributoDef {
   id: string;
@@ -84,23 +84,63 @@ export function ProductoForm({ existente }: { existente?: ProductoExistente }) {
   });
   const [stockInicial, setStockInicial] = useState<Record<string, { cantidad: string; costo: string }>>({});
 
-  useEffect(() => {
-    Promise.all([
+  const cargarAux = useCallback((): Promise<Aux | null> => {
+    return Promise.all([
       api<Categoria[]>("/categorias"),
       api<Aux["marcas"]>("/marcas"),
       api<Aux["unidades"]>("/unidades"),
     ])
       .then(([categorias, marcas, unidades]) => {
-        setAux({ categorias, marcas, unidades });
-        if (!existente && unidades.length && !unidadMedidaId) {
-          setUnidadMedidaId(unidades.find((u) => u.codigo === "UND")?.id ?? unidades[0].id);
-        }
+        const a: Aux = { categorias, marcas, unidades };
+        setAux(a);
+        return a;
       })
-      .catch(() => avisar("error", "No se pudo cargar el catálogo auxiliar."));
+      .catch(() => {
+        avisar("error", "No se pudo cargar el catálogo auxiliar.");
+        return null;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    void cargarAux();
+  }, [cargarAux]);
+
+  // Alta rápida de categoría y marca sin salir del formulario
+  const [nuevaCat, setNuevaCat] = useState<{ nombre: string; tipo: string; padreId: string } | null>(null);
+  const [nuevaMarca, setNuevaMarca] = useState<string | null>(null);
+
+  const crearCategoria = async () => {
+    if (!nuevaCat?.nombre.trim()) return;
+    try {
+      const c = await api<{ id: string }>("/categorias", {
+        cuerpo: { nombre: nuevaCat.nombre.trim(), tipo: nuevaCat.tipo, ...(nuevaCat.padreId ? { padreId: nuevaCat.padreId } : {}) },
+      });
+      await cargarAux();
+      setCategoriaId(c.id);
+      setNuevaCat(null);
+      avisar("ok", "Categoría creada. Puede definirle atributos en el propio formulario cuando los necesite.");
+    } catch (e) {
+      avisar("error", e instanceof ApiError ? e.message : "No se pudo crear la categoría.");
+    }
+  };
+
+  const crearMarca = async () => {
+    if (!nuevaMarca?.trim()) return;
+    try {
+      const m = await api<{ id: string }>("/marcas", { cuerpo: { nombre: nuevaMarca.trim() } });
+      await cargarAux();
+      setMarcaId(m.id);
+      setNuevaMarca(null);
+      avisar("ok", "Marca creada.");
+    } catch (e) {
+      avisar("error", e instanceof ApiError ? e.message : "No se pudo crear la marca.");
+    }
+  };
+
   const categoria = useMemo(() => aux?.categorias.find((c) => c.id === categoriaId), [aux, categoriaId]);
+  // Unidad efectiva: la elegida, o UND por defecto al crear (derivada, sin setState en effect)
+  const unidadEfectiva = unidadMedidaId || aux?.unidades.find((u) => u.codigo === "UND")?.id || aux?.unidades[0]?.id || "";
 
   const guardar = async () => {
     setOcupado(true);
@@ -118,7 +158,7 @@ export function ProductoForm({ existente }: { existente?: ProductoExistente }) {
         descripcion: descripcion || undefined,
         categoriaId: categoriaId || undefined,
         marcaId: marcaId || undefined,
-        unidadMedidaId,
+        unidadMedidaId: unidadEfectiva,
         precioBase: Number(precioBase).toFixed(2),
         tasaItbms,
         ventaFraccionada,
@@ -174,22 +214,39 @@ export function ProductoForm({ existente }: { existente?: ProductoExistente }) {
             <Campo etiqueta="Nombre">
               <Input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
             </Campo>
-            <Campo etiqueta="Categoría (define los atributos)">
+            <div>
+              <div className="flex items-center justify-between">
+                <Label>Categoría (define los atributos)</Label>
+                {puede("productos:crear") && (
+                  <button type="button" className="mb-1 text-xs text-primary hover:underline"
+                    onClick={() => setNuevaCat({ nombre: "", tipo: "GENERAL", padreId: "" })}>
+                    + nueva
+                  </button>
+                )}
+              </div>
               <Select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
                 <option value="">— Sin categoría —</option>
                 {aux.categorias.map((c) => (
                   <option key={c.id} value={c.id}>{c.padreId ? "· " : ""}{c.nombre}</option>
                 ))}
               </Select>
-            </Campo>
-            <Campo etiqueta="Marca">
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <Label>Marca</Label>
+                {puede("productos:crear") && (
+                  <button type="button" className="mb-1 text-xs text-primary hover:underline" onClick={() => setNuevaMarca("")}>
+                    + nueva
+                  </button>
+                )}
+              </div>
               <Select value={marcaId} onChange={(e) => setMarcaId(e.target.value)}>
                 <option value="">— Sin marca —</option>
                 {aux.marcas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
               </Select>
-            </Campo>
+            </div>
             <Campo etiqueta="Unidad de medida">
-              <Select value={unidadMedidaId} onChange={(e) => setUnidadMedidaId(e.target.value)}>
+              <Select value={unidadEfectiva} onChange={(e) => setUnidadMedidaId(e.target.value)}>
                 {aux.unidades.map((u) => <option key={u.id} value={u.id}>{u.codigo} — {u.nombre}</option>)}
               </Select>
             </Campo>
@@ -296,6 +353,48 @@ export function ProductoForm({ existente }: { existente?: ProductoExistente }) {
           )}
         </div>
       </div>
+
+      {nuevaCat && (
+        <Dialogo abierto onCerrar={() => setNuevaCat(null)} titulo="Categoría nueva">
+          <div className="space-y-3">
+            <Campo etiqueta="Nombre">
+              <Input autoFocus value={nuevaCat.nombre} onChange={(e) => setNuevaCat({ ...nuevaCat, nombre: e.target.value })} />
+            </Campo>
+            <Campo etiqueta="Tipo / área (RN-020)">
+              <Select value={nuevaCat.tipo} onChange={(e) => setNuevaCat({ ...nuevaCat, tipo: e.target.value })}>
+                <option value="FERRETERIA">Ferretería</option>
+                <option value="AUTOPARTE">Autoparte</option>
+                <option value="GENERAL">General</option>
+              </Select>
+            </Campo>
+            <Campo etiqueta="Categoría padre (opcional)">
+              <Select value={nuevaCat.padreId} onChange={(e) => setNuevaCat({ ...nuevaCat, padreId: e.target.value })}>
+                <option value="">— Raíz —</option>
+                {aux.categorias.filter((c) => !c.padreId).map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </Select>
+            </Campo>
+            <Button className="w-full" onClick={() => void crearCategoria()} disabled={!nuevaCat.nombre.trim()}>
+              Crear y seleccionar
+            </Button>
+          </div>
+        </Dialogo>
+      )}
+
+      {nuevaMarca !== null && (
+        <Dialogo abierto onCerrar={() => setNuevaMarca(null)} titulo="Marca nueva">
+          <div className="space-y-3">
+            <Campo etiqueta="Nombre de la marca">
+              <Input autoFocus value={nuevaMarca} onChange={(e) => setNuevaMarca(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void crearMarca(); }} />
+            </Campo>
+            <Button className="w-full" onClick={() => void crearMarca()} disabled={!nuevaMarca.trim()}>
+              Crear y seleccionar
+            </Button>
+          </div>
+        </Dialogo>
+      )}
     </div>
   );
 }

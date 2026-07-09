@@ -33,16 +33,50 @@ function InventarioContenido() {
   const [ajuste, setAjuste] = useState<FilaStock | null>(null);
   const [kardex, setKardex] = useState<{ producto: FilaStock["producto"]; movs: Mov[] } | null>(null);
 
-  const cargar = useCallback(() => {
-    api<{ datos: FilaStock[] }>(`/inventario/stock?limit=50${q ? `&q=${encodeURIComponent(q)}` : ""}${soloBajo ? "&bajo_minimo=true" : ""}`)
-      .then((r) => setFilas(r.datos))
-      .catch(() => setFilas([]));
-  }, [q, soloBajo]);
+  // Paginación por cursor (08 §2) para catálogos grandes (10k+ productos):
+  // `cursores[i]` es el cursor con el que se carga la página i (página 0 = sin cursor).
+  const [porPagina, setPorPagina] = useState(50);
+  const [cursores, setCursores] = useState<Array<string | null>>([null]);
+  const [pagina, setPagina] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
+  const cargar = useCallback((idx: number, cursorsArr: Array<string | null>) => {
+    const cursor = cursorsArr[idx];
+    api<{ datos: FilaStock[]; next_cursor: string | null }>(
+      `/inventario/stock?limit=${porPagina}${q ? `&q=${encodeURIComponent(q)}` : ""}${soloBajo ? "&bajo_minimo=true" : ""}${cursor ? `&cursor=${cursor}` : ""}`,
+    )
+      .then((r) => {
+        setFilas(r.datos);
+        setNextCursor(r.next_cursor);
+      })
+      .catch(() => setFilas([]));
+  }, [q, soloBajo, porPagina]);
+
+  // Cambio de filtro/búsqueda/tamaño → vuelve a la página 1
   useEffect(() => {
-    const t = setTimeout(cargar, q ? 250 : 0);
+    const t = setTimeout(() => {
+      setCursores([null]);
+      setPagina(0);
+      cargar(0, [null]);
+    }, q ? 250 : 0);
     return () => clearTimeout(t);
   }, [cargar, q]);
+
+  const irSiguiente = () => {
+    if (!nextCursor) return;
+    const nuevos = [...cursores.slice(0, pagina + 1), nextCursor];
+    setCursores(nuevos);
+    setPagina(pagina + 1);
+    setFilas(null);
+    cargar(pagina + 1, nuevos);
+  };
+  const irAnterior = () => {
+    if (pagina === 0) return;
+    setPagina(pagina - 1);
+    setFilas(null);
+    cargar(pagina - 1, cursores);
+  };
+  const recargarPagina = () => cargar(pagina, cursores);
 
   const verKardex = async (p: FilaStock["producto"]) => {
     try {
@@ -59,9 +93,20 @@ function InventarioContenido() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-bold">Inventario — stock por sucursal</h1>
-        <label className="flex items-center gap-2 text-sm text-muted">
-          <input type="checkbox" checked={soloBajo} onChange={(e) => setSoloBajo(e.target.checked)} /> Solo bajo mínimo
-        </label>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input type="checkbox" checked={soloBajo} onChange={(e) => setSoloBajo(e.target.checked)} /> Solo bajo mínimo
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            Ver
+            <Select className="w-20" value={String(porPagina)} onChange={(e) => setPorPagina(Number(e.target.value))}>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </Select>
+            por página
+          </label>
+        </div>
       </div>
       <Input placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-md" />
 
@@ -110,13 +155,25 @@ function InventarioContenido() {
         </Tabla>
       )}
 
+      {filas && (filas.length > 0 || pagina > 0) && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted">
+            Página {pagina + 1} · {filas.length} producto(s){nextCursor ? " · hay más" : filas.length > 0 ? " · fin de la lista" : ""}
+          </span>
+          <div className="flex gap-2">
+            <Button variante="secondary" onClick={irAnterior} disabled={pagina === 0}>‹ Anterior</Button>
+            <Button variante="secondary" onClick={irSiguiente} disabled={!nextCursor}>Siguiente ›</Button>
+          </div>
+        </div>
+      )}
+
       {ajuste && (
         <AjusteDialog
           fila={ajuste}
           sucursalId={sucursalId}
           onCerrar={(rec) => {
             setAjuste(null);
-            if (rec) cargar();
+            if (rec) recargarPagina();
           }}
         />
       )}

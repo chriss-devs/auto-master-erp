@@ -122,10 +122,14 @@ export class InventarioController {
     @Query('limit') limit = '50',
     @Query('cursor') cursor?: string,
   ) {
-    const take = Math.min(Number(limit) || 50, 200);
+    const filtraBajo = bajoMinimo === 'true';
+    // "Bajo mínimo" es una lista de alertas (subconjunto pequeño): se filtra sobre los productos
+    // con mínimo configurado y se devuelve completa (hasta 200), sin paginar.
+    const take = filtraBajo ? 200 : Math.min(Number(limit) || 50, 200);
     const where: Prisma.ProductoWhereInput = {
       tenantId: ctx.tenantId,
       estado: 'ACTIVO',
+      ...(filtraBajo ? { stockMinimo: { gt: 0 } } : {}),
       ...(q
         ? {
             OR: [
@@ -140,19 +144,20 @@ export class InventarioController {
       where,
       include: { stocks: { include: { sucursal: { select: { id: true, codigo: true, nombre: true } } } }, unidadMedida: true },
       orderBy: { nombre: 'asc' },
-      take: take + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: filtraBajo ? undefined : take + 1,
+      ...(cursor && !filtraBajo ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
     let datos = productos.map((p) => ({
       producto: { id: p.id, sku: p.sku, nombre: p.nombre, unidad: p.unidadMedida.codigo, stockMinimo: p.stockMinimo },
       stocks: p.stocks.map((s) => ({ sucursal: s.sucursal, cantidad: s.cantidad, costoPromedio: s.costoPromedio })),
     }));
-    if (bajoMinimo === 'true') {
+    if (filtraBajo) {
       datos = datos.filter((d) => {
         const st = sucursal ? d.stocks.filter((s) => s.sucursal.id === sucursal) : d.stocks;
         const total = st.reduce((a, s) => a.add(D(s.cantidad)), D(0));
-        return D(d.producto.stockMinimo).gt(0) && total.lte(D(d.producto.stockMinimo));
+        return total.lte(D(d.producto.stockMinimo));
       });
+      return { datos: datos.slice(0, take), next_cursor: null };
     }
     const hayMas = productos.length > take;
     return { datos: datos.slice(0, take), next_cursor: hayMas ? productos[take - 1].id : null };

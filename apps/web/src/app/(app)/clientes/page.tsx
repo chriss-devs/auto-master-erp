@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { fmtMoney } from "@/lib/format";
 import { useSesion } from "@/lib/session";
+import { Paginador, usePaginacion } from "@/components/paginacion";
 import { Badge, Button, Campo, Dialogo, Input, Select, Spinner, Tabla, Td, Th, Vacio, useToast } from "@/components/ui";
 
 interface Cliente {
@@ -27,20 +28,10 @@ interface PrecioEspecial {
 export default function ClientesPage() {
   const { puede } = useSesion();
   const [q, setQ] = useState("");
-  const [filas, setFilas] = useState<Cliente[] | null>(null);
+  const pag = usePaginacion<Cliente>(`/clientes${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+  const filas = pag.filas;
   const [editando, setEditando] = useState<Cliente | "nuevo" | null>(null);
   const [detalle, setDetalle] = useState<(Cliente & { preciosEspeciales: PrecioEspecial[] }) | null>(null);
-
-  const cargar = useCallback(() => {
-    api<{ datos: Cliente[] }>(`/clientes?limit=50${q ? `&q=${encodeURIComponent(q)}` : ""}`)
-      .then((r) => setFilas(r.datos))
-      .catch(() => setFilas([]));
-  }, [q]);
-
-  useEffect(() => {
-    const t = setTimeout(cargar, q ? 250 : 0);
-    return () => clearTimeout(t);
-  }, [cargar, q]);
 
   const verDetalle = (c: Cliente) => {
     api<typeof detalle>(`/clientes/${c.id}`).then(setDetalle).catch(() => {});
@@ -57,6 +48,7 @@ export default function ClientesPage() {
       {!filas ? (
         <Spinner />
       ) : (
+        <>
         <Tabla>
           <thead>
             <tr><Th>Nombre</Th><Th>Tipo</Th><Th>RUC/Cédula</Th><Th>Teléfono</Th><Th className="w-40"> </Th></tr>
@@ -78,6 +70,8 @@ export default function ClientesPage() {
             ))}
           </tbody>
         </Tabla>
+        <Paginador p={pag} nombre="cliente(s)" />
+        </>
       )}
 
       {editando && (
@@ -85,7 +79,7 @@ export default function ClientesPage() {
           cliente={editando === "nuevo" ? null : editando}
           onCerrar={(rec) => {
             setEditando(null);
-            if (rec) cargar();
+            if (rec) pag.recargar();
           }}
         />
       )}

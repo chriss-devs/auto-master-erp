@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useState } from "react";
 import { fmtFecha } from "@/lib/format";
-import { Badge, Button, Input, Spinner, Tabla, Td, Th, Vacio } from "@/components/ui";
+import { Paginador, usePaginacion } from "@/components/paginacion";
+import { Badge, Input, Spinner, Tabla, Td, Th, Vacio } from "@/components/ui";
 
 interface Evento {
   id: string;
@@ -20,27 +20,13 @@ interface Evento {
 export default function AuditoriaPage() {
   const [entidad, setEntidad] = useState("");
   const [accion, setAccion] = useState("");
-  const [filas, setFilas] = useState<Evento[] | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
 
-  const cargar = useCallback((reset = true, cur?: string | null) => {
-    const qs = new URLSearchParams({ limit: "40" });
-    if (entidad) qs.set("entidad", entidad);
-    if (accion) qs.set("accion", accion);
-    if (cur) qs.set("cursor", cur);
-    api<{ datos: Evento[]; next_cursor: string | null }>(`/auditoria?${qs}`)
-      .then((r) => {
-        setFilas((f) => (reset || !f ? r.datos : [...f, ...r.datos]));
-        setCursor(r.next_cursor);
-      })
-      .catch(() => setFilas([]));
-  }, [entidad, accion]);
-
-  useEffect(() => {
-    const t = setTimeout(() => cargar(true), 250);
-    return () => clearTimeout(t);
-  }, [cargar]);
+  const qs = new URLSearchParams();
+  if (entidad) qs.set("entidad", entidad);
+  if (accion) qs.set("accion", accion);
+  const pag = usePaginacion<Evento>(`/auditoria${qs.size ? `?${qs}` : ""}`);
+  const filas = pag.filas;
 
   return (
     <div className="space-y-3">
@@ -66,11 +52,7 @@ export default function AuditoriaPage() {
               ))}
             </tbody>
           </Tabla>
-          {cursor && (
-            <div className="text-center">
-              <Button variante="secondary" onClick={() => cargar(false, cursor)}>Cargar más</Button>
-            </div>
-          )}
+          <Paginador p={pag} nombre="evento(s)" />
         </>
       )}
     </div>

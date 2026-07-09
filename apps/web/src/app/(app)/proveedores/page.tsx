@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSesion } from "@/lib/session";
+import { Paginador, usePaginacion } from "@/components/paginacion";
 import { Button, Campo, Dialogo, Input, Spinner, Tabla, Td, Th, Vacio, useToast } from "@/components/ui";
 
 interface Proveedor {
@@ -18,19 +19,9 @@ interface Proveedor {
 export default function ProveedoresPage() {
   const { puede } = useSesion();
   const [q, setQ] = useState("");
-  const [filas, setFilas] = useState<Proveedor[] | null>(null);
+  const pag = usePaginacion<Proveedor>(`/proveedores${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+  const filas = pag.filas;
   const [editando, setEditando] = useState<Proveedor | "nuevo" | null>(null);
-
-  const cargar = useCallback(() => {
-    api<{ datos: Proveedor[] }>(`/proveedores?limit=50${q ? `&q=${encodeURIComponent(q)}` : ""}`)
-      .then((r) => setFilas(r.datos))
-      .catch(() => setFilas([]));
-  }, [q]);
-
-  useEffect(() => {
-    const t = setTimeout(cargar, q ? 250 : 0);
-    return () => clearTimeout(t);
-  }, [cargar, q]);
 
   return (
     <div className="space-y-3">
@@ -45,6 +36,7 @@ export default function ProveedoresPage() {
       ) : filas.length === 0 ? (
         <Vacio texto="Sin proveedores." />
       ) : (
+        <>
         <Tabla>
           <thead><tr><Th>Nombre</Th><Th>RUC</Th><Th>Teléfono</Th><Th>Correo</Th><Th className="w-20"> </Th></tr></thead>
           <tbody>
@@ -63,6 +55,8 @@ export default function ProveedoresPage() {
             ))}
           </tbody>
         </Tabla>
+        <Paginador p={pag} nombre="proveedor(es)" />
+        </>
       )}
 
       {editando && (
@@ -70,7 +64,7 @@ export default function ProveedoresPage() {
           proveedor={editando === "nuevo" ? null : editando}
           onCerrar={(rec) => {
             setEditando(null);
-            if (rec) cargar();
+            if (rec) pag.recargar();
           }}
         />
       )}

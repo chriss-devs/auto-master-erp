@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { fmtFecha, fmtMoney } from "@/lib/format";
 import { useSesion } from "@/lib/session";
+import { Paginador, usePaginacion } from "@/components/paginacion";
 import { Badge, Select, Spinner, Tabla, Td, Th, Vacio, useToast } from "@/components/ui";
 
 interface Factura {
@@ -32,15 +33,8 @@ function FacturasContenido() {
   const { avisar } = useToast();
   const params = useSearchParams();
   const [estado, setEstado] = useState(params.get("estado") ?? "");
-  const [filas, setFilas] = useState<Factura[] | null>(null);
-
-  const cargar = useCallback(() => {
-    api<{ datos: Factura[] }>(`/facturas?limit=50${estado ? `&estado=${estado}` : ""}`)
-      .then((r) => setFilas(r.datos))
-      .catch(() => setFilas([]));
-  }, [estado]);
-
-  useEffect(cargar, [cargar]);
+  const pag = usePaginacion<Factura>(`/facturas${estado ? `?estado=${estado}` : ""}`);
+  const filas = pag.filas;
 
   const retransmitir = async (id: string) => {
     try {
@@ -50,7 +44,7 @@ function FacturasContenido() {
       } else {
         avisar("ok", `Factura ${r.numero}: ${r.estado}.`);
       }
-      cargar();
+      pag.recargar();
     } catch (e) {
       avisar("error", e instanceof ApiError ? e.message : "No se pudo retransmitir.");
     }
@@ -74,6 +68,7 @@ function FacturasContenido() {
       ) : filas.length === 0 ? (
         <Vacio texto="Sin facturas." />
       ) : (
+        <>
         <Tabla>
           <thead>
             <tr>
@@ -102,6 +97,8 @@ function FacturasContenido() {
             ))}
           </tbody>
         </Tabla>
+        <Paginador p={pag} nombre="factura(s)" />
+        </>
       )}
       <p className="text-xs text-muted">
         Las facturas se emiten en modo contingencia (RF-FAC-005): la venta nunca se bloquea. Al contratar el PAC (Q-002) se transmite lo pendiente sin cambios en Ventas (D-012).

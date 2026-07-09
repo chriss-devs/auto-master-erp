@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useState } from "react";
 import { fmtMoney, fmtQty, pct } from "@/lib/format";
 import { useSesion } from "@/lib/session";
+import { Paginador, usePaginacion } from "@/components/paginacion";
 import { Badge, Button, Input, Spinner, Tabla, Td, Th, Vacio } from "@/components/ui";
 
 interface Fila {
@@ -23,23 +23,8 @@ interface Fila {
 export default function ProductosPage() {
   const { puede, me } = useSesion();
   const [q, setQ] = useState("");
-  const [filas, setFilas] = useState<Fila[] | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
-
-  const cargar = (reset = true, cur?: string | null) => {
-    api<{ datos: Fila[]; next_cursor: string | null }>(`/productos?limit=30${q ? `&q=${encodeURIComponent(q)}` : ""}${cur ? `&cursor=${cur}` : ""}`)
-      .then((r) => {
-        setFilas((f) => (reset || !f ? r.datos : [...f, ...r.datos]));
-        setCursor(r.next_cursor);
-      })
-      .catch(() => setFilas([]));
-  };
-
-  useEffect(() => {
-    const t = setTimeout(() => cargar(true), q ? 250 : 0);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  const pag = usePaginacion<Fila>(`/productos${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+  const filas = pag.filas;
 
   const sucursales = me?.sucursales ?? [];
 
@@ -85,11 +70,7 @@ export default function ProductosPage() {
               ))}
             </tbody>
           </Tabla>
-          {cursor && (
-            <div className="text-center">
-              <Button variante="secondary" onClick={() => cargar(false, cursor)}>Cargar más</Button>
-            </div>
-          )}
+          <Paginador p={pag} nombre="producto(s)" />
         </>
       )}
     </div>

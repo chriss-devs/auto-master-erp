@@ -160,9 +160,15 @@ export function Dialogo({
       if (e.key === "Escape" && !forzado) onCerrar();
     };
     window.addEventListener("keydown", h);
-    ref.current?.querySelector<HTMLElement>("input, select, button")?.focus();
     return () => window.removeEventListener("keydown", h);
   }, [abierto, forzado, onCerrar]);
+
+  // Enfoque inicial SOLO al abrir (nunca en re-renders por tipeo) y nunca sobre la ✕ de cerrar
+  useEffect(() => {
+    if (abierto) {
+      ref.current?.querySelector<HTMLElement>("input, select, textarea, button:not([data-cerrar])")?.focus();
+    }
+  }, [abierto]);
 
   if (!abierto) return null;
   return (
@@ -171,7 +177,7 @@ export function Dialogo({
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold">{titulo}</h2>
           {!forzado && (
-            <button onClick={onCerrar} className="rounded p-1 text-muted hover:bg-page" aria-label="Cerrar">
+            <button data-cerrar onClick={onCerrar} tabIndex={-1} className="rounded p-1 text-muted hover:bg-page" aria-label="Cerrar">
               ✕
             </button>
           )}

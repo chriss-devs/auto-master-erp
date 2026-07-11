@@ -1,15 +1,8 @@
 import { Controller, Get, Module } from '@nestjs/common';
 import { Ctx, RequierePermiso, SucursalActual, UsuarioActual } from '../common/decorators';
 import { D, money } from '../common/dinero';
+import { rangoDiaPanama } from '../common/fechas';
 import { PrismaService } from '../common/prisma.service';
-
-/** Día operativo en America/Panama (UTC-5 fijo, sin DST — BL-014). */
-function rangoDiaPanama(offsetDias = 0, ahora = new Date()): { desde: Date; hasta: Date } {
-  const offsetMs = 5 * 3600_000;
-  const local = new Date(ahora.getTime() - offsetMs);
-  const inicioLocal = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + offsetDias);
-  return { desde: new Date(inicioLocal + offsetMs), hasta: new Date(inicioLocal + offsetMs + 24 * 3600_000) };
-}
 
 @Controller('dashboard')
 export class DashboardController {

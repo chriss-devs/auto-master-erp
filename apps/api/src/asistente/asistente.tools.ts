@@ -242,14 +242,20 @@ export const HERRAMIENTAS: Herramienta[] = [
         select: { id: true, nombre: true, rucOCedula: true, telefono: true },
       });
       if (!clientes.length) return { clientes: [] };
+      const base = {
+        clientes: clientes.map((c) => ({ nombre: c.nombre, rucOCedula: c.rucOCedula, telefono: c.telefono, url: '/clientes' })),
+      };
+      // Las compras son datos de VENTAS: se exponen solo si el usuario tiene ventas:ver
+      // (este tool solo exige clientes:ver) y acotadas a sus sucursales visibles (no cruzar sucursal).
+      if (!ctx.permisos.has('ventas:ver')) return base;
       const compras = await deps.prisma.venta.findMany({
-        where: { tenantId: ctx.tenantId, clienteId: clientes[0].id, estado: 'COBRADA' },
+        where: { tenantId: ctx.tenantId, clienteId: clientes[0].id, estado: 'COBRADA', sucursalId: { in: ctx.sucursalIds } },
         orderBy: { cobradaEn: 'desc' },
         take: 3,
         select: { numero: true, total: true, cobradaEn: true },
       });
       return {
-        clientes: clientes.map((c) => ({ nombre: c.nombre, rucOCedula: c.rucOCedula, telefono: c.telefono, url: '/clientes' })),
+        ...base,
         ultimasComprasDelPrimero: compras.map((v) => ({ numero: v.numero, total: money(v.total), fecha: v.cobradaEn?.toISOString() ?? null })),
       };
     },

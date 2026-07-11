@@ -66,4 +66,42 @@ describe('ejecución con deps simuladas', () => {
     const r: any = await h.ejecutar({ prisma: {} as any, productos: {} as any }, ctxCon(['ventas:ver']), { fecha: 'ayer' });
     expect(r.error).toMatch(/fecha/i);
   });
+
+  it('buscar_cliente con ventas:ver acota compras a las sucursales visibles (no cruza sucursal)', async () => {
+    const h = HERRAMIENTAS.find((x) => x.nombre === 'buscar_cliente')!;
+    const ventaFindMany = jest.fn(async (_args: any) => [
+      { numero: 'V-0001-0007', total: '25.00', cobradaEn: new Date('2026-07-01T15:00:00Z') },
+    ]);
+    const prisma = {
+      cliente: { findMany: jest.fn(async () => [{ id: 'c1', nombre: 'Juan', rucOCedula: '8-1', telefono: '60000000' }]) },
+      venta: { findMany: ventaFindMany },
+    };
+    const r: any = await h.ejecutar({ prisma: prisma as any, productos: {} as any }, ctxCon(['clientes:ver', 'ventas:ver']), { q: 'Juan' });
+    // La consulta de compras DEBE filtrar por sucursalId ∈ sucursalIds del usuario
+    expect(ventaFindMany).toHaveBeenCalledTimes(1);
+    expect(ventaFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 't1',
+          clienteId: 'c1',
+          estado: 'COBRADA',
+          sucursalId: { in: ['suc1', 'suc2'] },
+        }),
+      }),
+    );
+    expect(r.ultimasComprasDelPrimero[0].total).toBe('25.00');
+  });
+
+  it('buscar_cliente SIN ventas:ver no expone compras (dato de ventas) ni consulta ventas', async () => {
+    const h = HERRAMIENTAS.find((x) => x.nombre === 'buscar_cliente')!;
+    const ventaFindMany = jest.fn();
+    const prisma = {
+      cliente: { findMany: jest.fn(async () => [{ id: 'c1', nombre: 'Juan', rucOCedula: '8-1', telefono: '60000000' }]) },
+      venta: { findMany: ventaFindMany },
+    };
+    const r: any = await h.ejecutar({ prisma: prisma as any, productos: {} as any }, ctxCon(['clientes:ver']), { q: 'Juan' });
+    expect(r.clientes).toHaveLength(1);
+    expect(r).not.toHaveProperty('ultimasComprasDelPrimero');
+    expect(ventaFindMany).not.toHaveBeenCalled();
+  });
 });

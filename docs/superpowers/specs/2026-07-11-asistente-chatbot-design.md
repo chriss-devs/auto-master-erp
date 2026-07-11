@@ -57,10 +57,12 @@ resp: { respuesta: string }   // enlaces inline en el texto: [etiqueta](/ruta-in
 | `stock_de_producto(productoId)` | `stock` por sucursal | `productos:ver` | stock por sucursal visible + stock mínimo |
 | `productos_bajo_minimo()` | query de dashboard | `inventario:ver` | lista de alertas (top 15) |
 | `ventas_del_dia(fecha?)` | queries del dashboard | `ventas:ver` | total, #ventas, utilidad, por método de pago |
-| `estado_caja()` | `caja_sesion` abierta + movimientos | `caja:ver` | abierta/cerrada, efectivo esperado |
-| `cuentas_por_cobrar()` | query de por cobrar | `ventas:ver` | total pendiente + principales deudores |
+| `estado_caja()` | `caja_sesion` abierta + movimientos | `caja:operar` o `caja:ver_todas` | abierta/cerrada, efectivo esperado |
+| `ventas_pendientes()` | ventas en PREPARACION | `ventas:ver` | pendientes de cobro en ventanilla (no existe crédito en el modelo de datos; "por cobrar" = PREPARACION) |
 | `top_productos(dias?)` | agregado de ventas | `ventas:ver` | más vendidos últimos N días |
-| `buscar_cliente(q)` | búsqueda de clientes | `clientes:ver` | cliente + saldo |
+| `buscar_cliente(q)` | búsqueda de clientes | `clientes:ver` | cliente + últimas compras |
+
+Cada herramienta declara `permisos: string[]` — el usuario necesita **alguno** de ellos (los códigos reales del seed no siempre tienen un `x:ver` único).
 
 Convenciones de resultado: JSON compacto; dinero como string decimal; cantidades como número; fechas en TZ Panamá; cada entidad incluye `url` interna (`/productos/{id}`, `/clientes/{id}`, …) para que la respuesta lleve "Ver →". Errores de herramienta devuelven `{ error }` al modelo (se disculpa, no alucina).
 

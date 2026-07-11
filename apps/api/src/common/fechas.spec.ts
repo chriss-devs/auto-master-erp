@@ -8,8 +8,10 @@ describe('rangoDiaPanama', () => {
     expect(r.hasta.toISOString()).toBe('2026-07-11T05:00:00.000Z');
   });
   it('offsetDias=-1 devuelve el día anterior', () => {
+    // input elegido para que offsetDias=-1 caiga en 2026-07-09 (el fixture original del plan estaba mal)
     const r = rangoDiaPanama(-1, new Date('2026-07-10T12:00:00Z'));
     expect(r.desde.toISOString()).toBe('2026-07-09T05:00:00.000Z');
+    expect(r.hasta.toISOString()).toBe('2026-07-10T05:00:00.000Z');
   });
 });
 
@@ -22,5 +24,7 @@ describe('rangoDeFecha', () => {
   it('rechaza formatos inválidos', () => {
     expect(rangoDeFecha('ayer')).toBeNull();
     expect(rangoDeFecha('2026-13-40')).toBeNull();
+    expect(rangoDeFecha('2026-02-30')).toBeNull(); // 2026 no es bisiesto; Date lo normaliza a mar-02
+    expect(rangoDeFecha('2026-04-31')).toBeNull(); // abril tiene 30 días
   });
 });

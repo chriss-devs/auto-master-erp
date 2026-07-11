@@ -81,3 +81,4 @@ apps/
 - ITBMS 7% por línea, configurable por producto (RN-024/042); costeo promedio ponderado (RN-009).
 - Facturación con `PacProvider` enchufable; stub en contingencia genera CUFE simulado y representación imprimible carta; nunca bloquea la venta (RF-FAC-005).
 - RBAC recurso:acción con matriz de 09 §3.3, acotado por sucursal; auditoría inmutable (RN-182); soft-delete de entidades críticas (RN-183).
+- Asistente: chat flotante que responde con datos vivos (stock, ventas, caja, clientes) vía DeepSeek tool calling, acotado por RBAC y sucursal; solo lectura, con enlaces a las pantallas (requiere `DEEPSEEK_API_KEY` en el api).

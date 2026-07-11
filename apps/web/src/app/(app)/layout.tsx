@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { SesionProvider, useSesion } from "@/lib/session";
 import { Button, Campo, Dialogo, Input, Kbd, Select, Spinner, ToastProvider, useToast, cx } from "@/components/ui";
+import { AsistenteWidget } from "@/components/asistente";
 
 const NAV: Array<{ ruta: string; texto: string; permiso: string; tecla?: string }> = [
   { ruta: "/", texto: "Dashboard", permiso: "reportes:ver", tecla: "F1" },
@@ -162,6 +163,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
+
+      <AsistenteWidget />
     </div>
   );
 }

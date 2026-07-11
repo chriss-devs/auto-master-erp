@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
+import { AsistenteModule } from './asistente/asistente.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { AuthModule } from './auth/auth.module';
 import { CajaModule } from './caja/caja.module';
@@ -29,6 +30,7 @@ import { VentasModule } from './ventas/ventas.module';
     CajaModule,
     FacturacionModule,
     DashboardModule,
+    AsistenteModule,
     AdminModule,
   ],
   controllers: [AppController],

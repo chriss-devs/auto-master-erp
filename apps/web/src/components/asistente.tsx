@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCommentDots, faPaperPlane, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { api, ApiError } from "@/lib/api";
 import { useSesion } from "@/lib/session";
 import { cx } from "@/components/ui";
@@ -49,16 +51,16 @@ export function renderizarRespuesta(texto: string): React.ReactNode {
   return <>{partes}</>;
 }
 
-/** Avatar circular reutilizado en el header y en cada mensaje del asistente (mismo glifo, sin SVG — 11 §2 lenguaje de íconos del sistema). */
+/** Avatar circular reutilizado en el header y en cada mensaje del asistente (ícono FontAwesome). */
 function AvatarAsistente({ tamano = "md" }: { tamano?: "sm" | "md" }) {
   return (
     <span
       className={cx(
-        "flex shrink-0 items-center justify-center rounded-full bg-primary-light",
-        tamano === "sm" ? "h-6 w-6 text-xs" : "h-8 w-8 text-base",
+        "flex shrink-0 items-center justify-center rounded-full bg-primary-light text-primary",
+        tamano === "sm" ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-sm",
       )}
     >
-      💬
+      <FontAwesomeIcon icon={faCommentDots} />
     </span>
   );
 }
@@ -171,7 +173,7 @@ export function AsistenteWidget() {
                 className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
                 onClick={() => setAbierto(false)}
               >
-                ✕
+                <FontAwesomeIcon icon={faXmark} />
               </button>
             </div>
           </div>
@@ -235,9 +237,9 @@ export function AsistenteWidget() {
               type="submit"
               aria-label="Enviar pregunta"
               disabled={pensando || !texto.trim()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-base text-white transition-opacity hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm text-white transition-opacity hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40"
             >
-              ➤
+              <FontAwesomeIcon icon={faPaperPlane} />
             </button>
           </form>
         </div>
@@ -246,7 +248,7 @@ export function AsistenteWidget() {
       <button
         aria-label={abierto ? "Cerrar asistente" : "Abrir asistente"}
         onClick={() => setAbierto((v) => !v)}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-xl text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl"
       >
         <span
           className={cx(
@@ -254,7 +256,7 @@ export function AsistenteWidget() {
             abierto && "rotate-180",
           )}
         >
-          {abierto ? "✕" : "💬"}
+          <FontAwesomeIcon icon={abierto ? faXmark : faCommentDots} />
         </span>
       </button>
     </div>

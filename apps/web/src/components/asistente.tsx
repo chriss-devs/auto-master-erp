@@ -49,7 +49,7 @@ export function renderizarRespuesta(texto: string): React.ReactNode {
   return <>{partes}</>;
 }
 
-/** Avatar circular reutilizado en el header y en cada mensaje del asistente (mismo glifo, sin SVG — 11 §2 lenguaje de íconos del ERP). */
+/** Avatar circular reutilizado en el header y en cada mensaje del asistente (mismo glifo, sin SVG — 11 §2 lenguaje de íconos del sistema). */
 function AvatarAsistente({ tamano = "md" }: { tamano?: "sm" | "md" }) {
   return (
     <span
@@ -105,9 +105,12 @@ export function AsistenteWidget() {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes]);
 
-  // El panel queda montado siempre (transición de fade+scale); el foco se dispara al abrir en vez de vía autoFocus.
+  // Al abrir: foco en el input y salto instantáneo al final del historial (sin animación,
+  // para no obligar a scrollear manualmente si ya había mensajes de la pestaña).
   useEffect(() => {
-    if (abierto) inputRef.current?.focus();
+    if (!abierto) return;
+    inputRef.current?.focus();
+    finRef.current?.scrollIntoView({ behavior: "auto" });
   }, [abierto]);
 
   if (!me) return null;
@@ -149,7 +152,7 @@ export function AsistenteWidget() {
               <div className="text-sm font-semibold leading-tight">
                 Asistente
                 <div className="text-xs font-normal text-muted">
-                  Consulta tu ERP
+                  Consulta stock, ventas y más
                 </div>
               </div>
             </div>

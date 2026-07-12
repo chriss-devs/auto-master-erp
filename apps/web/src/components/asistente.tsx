@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSesion } from "@/lib/session";
-import { Button, Input, cx } from "@/components/ui";
+import { cx } from "@/components/ui";
 
 interface Mensaje {
   rol: "user" | "assistant";
@@ -12,7 +12,11 @@ interface Mensaje {
 }
 
 const CLAVE_STORAGE = "am-asistente";
-const SUGERENCIAS = ["¿Cuánto vendimos hoy?", "Productos bajo mínimo", "¿Está abierta la caja?"];
+const SUGERENCIAS = [
+  "¿Cuánto vendimos hoy?",
+  "Productos bajo mínimo",
+  "¿Está abierta la caja?",
+];
 
 /** Render seguro (spec): SOLO **negritas** y enlaces internos [etiqueta](/ruta). Nada de HTML/markdown crudo. */
 export function renderizarRespuesta(texto: string): React.ReactNode {
@@ -28,7 +32,11 @@ export function renderizarRespuesta(texto: string): React.ReactNode {
     if (m.index > ultimo) partes.push(texto.slice(ultimo, m.index));
     if (m[1] !== undefined) {
       partes.push(
-        <Link key={k++} href={m[2]} className="font-medium text-primary underline">
+        <Link
+          key={k++}
+          href={m[2]}
+          className="font-medium text-primary underline underline-offset-2"
+        >
           {m[1]}
         </Link>,
       );
@@ -39,6 +47,37 @@ export function renderizarRespuesta(texto: string): React.ReactNode {
   }
   if (ultimo < texto.length) partes.push(texto.slice(ultimo));
   return <>{partes}</>;
+}
+
+/** Avatar circular reutilizado en el header y en cada mensaje del asistente (mismo glifo, sin SVG — 11 §2 lenguaje de íconos del ERP). */
+function AvatarAsistente({ tamano = "md" }: { tamano?: "sm" | "md" }) {
+  return (
+    <span
+      className={cx(
+        "flex shrink-0 items-center justify-center rounded-full bg-primary-light",
+        tamano === "sm" ? "h-6 w-6 text-xs" : "h-8 w-8 text-base",
+      )}
+    >
+      💬
+    </span>
+  );
+}
+
+function IndicadorEscribiendo() {
+  return (
+    <div className="flex items-start gap-2">
+      <AvatarAsistente tamano="sm" />
+      <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-page px-3 py-2.5">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted"
+            style={{ animationDelay: `${i * 120}ms` }}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function AsistenteWidget() {
@@ -58,12 +97,18 @@ export function AsistenteWidget() {
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Persistir el historial de la pestaña y auto-scroll al final al cambiar los mensajes.
   useEffect(() => {
     sessionStorage.setItem(CLAVE_STORAGE, JSON.stringify(mensajes.slice(-30)));
     finRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes]);
+
+  // El panel queda montado siempre (transición de fade+scale); el foco se dispara al abrir en vez de vía autoFocus.
+  useEffect(() => {
+    if (abierto) inputRef.current?.focus();
+  }, [abierto]);
 
   if (!me) return null;
 
@@ -79,7 +124,10 @@ export function AsistenteWidget() {
         cuerpo: { mensajes: historial.slice(-10) },
         sucursalId,
       });
-      setMensajes((prev) => [...prev, { rol: "assistant", contenido: r.respuesta }]);
+      setMensajes((prev) => [
+        ...prev,
+        { rol: "assistant", contenido: r.respuesta },
+      ]);
     } catch (err) {
       const msg =
         err instanceof ApiError && err.codigo === "ASISTENTE_NO_CONFIGURADO"
@@ -92,14 +140,22 @@ export function AsistenteWidget() {
   };
 
   return (
-    <div className="no-print fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div className="no-print fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">
       {abierto && (
-        <div className="flex h-[520px] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-xl max-sm:fixed max-sm:inset-2 max-sm:h-auto max-sm:w-auto">
-          <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <div className="text-sm font-semibold">Asistente</div>
-            <div className="flex items-center gap-3">
+        <div className="flex h-[520px] w-[380px] max-w-[calc(100vw-2rem)] origin-bottom-right animate-[asistente-pop-in_150ms_ease-out] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl shadow-ink/10 max-sm:fixed max-sm:inset-2 max-sm:h-auto max-sm:w-auto">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <AvatarAsistente />
+              <div className="text-sm font-semibold leading-tight">
+                Asistente
+                <div className="text-xs font-normal text-muted">
+                  Consulta tu ERP
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
               <button
-                className="text-xs text-muted hover:text-ink"
+                className="rounded-md px-2 py-1 text-xs text-muted hover:bg-page hover:text-ink"
                 onClick={() => {
                   setMensajes([]);
                   sessionStorage.removeItem(CLAVE_STORAGE);
@@ -107,69 +163,96 @@ export function AsistenteWidget() {
               >
                 Limpiar
               </button>
-              <button aria-label="Cerrar asistente" className="text-muted hover:text-ink" onClick={() => setAbierto(false)}>
+              <button
+                aria-label="Cerrar asistente"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
+                onClick={() => setAbierto(false)}
+              >
                 ✕
               </button>
             </div>
           </div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto p-3 text-sm">
+          <div className="flex-1 space-y-3 overflow-y-auto p-3 text-sm">
             {mensajes.length === 0 && (
-              <div className="space-y-2">
-                <p className="text-muted">Pregúntame sobre stock, ventas, caja o clientes.</p>
-                {SUGERENCIAS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => void preguntar(s)}
-                    className="block rounded-full border border-border px-3 py-1 text-xs text-primary hover:bg-primary-light"
-                  >
-                    {s}
-                  </button>
-                ))}
+              <div className="space-y-2.5">
+                <p className="text-muted">
+                  Pregúntame sobre stock, ventas, caja o clientes.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SUGERENCIAS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => void preguntar(s)}
+                      className="rounded-full border border-border px-3 py-1 text-xs text-primary transition-shadow hover:bg-primary-light hover:shadow-sm"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-            {mensajes.map((m, i) => (
-              <div
-                key={i}
-                className={cx(
-                  "max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2",
-                  m.rol === "user" ? "ml-auto bg-primary text-white" : "bg-page text-ink",
-                )}
-              >
-                {m.rol === "assistant" ? renderizarRespuesta(m.contenido) : m.contenido}
-              </div>
-            ))}
-            {pensando && <div className="text-xs text-muted">Pensando…</div>}
+            {mensajes.map((m, i) =>
+              m.rol === "user" ? (
+                <div
+                  key={i}
+                  className="ml-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-3 py-2 text-white"
+                >
+                  {m.contenido}
+                </div>
+              ) : (
+                <div key={i} className="flex items-start gap-2">
+                  <AvatarAsistente tamano="sm" />
+                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-page px-3 py-2 text-ink">
+                    {renderizarRespuesta(m.contenido)}
+                  </div>
+                </div>
+              ),
+            )}
+            {pensando && <IndicadorEscribiendo />}
             <div ref={finRef} />
           </div>
 
           <form
-            className="flex gap-2 border-t border-border p-2"
+            className="flex items-center gap-2 border-t border-border p-2"
             onSubmit={(e) => {
               e.preventDefault();
               void preguntar(texto);
             }}
           >
-            <Input
+            <input
+              ref={inputRef}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               placeholder="Escribe tu pregunta…"
               disabled={pensando}
-              autoFocus
+              className="w-full rounded-full border border-border bg-page px-3.5 py-2 text-sm placeholder:text-muted disabled:opacity-60"
             />
-            <Button type="submit" disabled={pensando || !texto.trim()}>
-              Enviar
-            </Button>
+            <button
+              type="submit"
+              aria-label="Enviar pregunta"
+              disabled={pensando || !texto.trim()}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-base text-white transition-opacity hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ➤
+            </button>
           </form>
         </div>
       )}
 
       <button
-        aria-label="Abrir asistente"
+        aria-label={abierto ? "Cerrar asistente" : "Abrir asistente"}
         onClick={() => setAbierto((v) => !v)}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-xl text-white shadow-lg hover:opacity-90"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-xl text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl"
       >
-        💬
+        <span
+          className={cx(
+            "inline-block transition-transform duration-150",
+            abierto && "rotate-180",
+          )}
+        >
+          {abierto ? "✕" : "💬"}
+        </span>
       </button>
     </div>
   );

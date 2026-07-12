@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
 import "./globals.css";
+
+config.autoAddCss = false; // el CSS se importa arriba; evita que la librería lo inyecte por JS (mismatch de hidratación)
 
 export const metadata: Metadata = {
   title: "Auto Master Colón — ERP",

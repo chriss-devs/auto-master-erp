@@ -308,7 +308,7 @@ export default function VenderPage() {
                     <DescuentoPopover
                       valor={l.descuento}
                       presets={presets}
-                      etiqueta="—"
+                      ariaLabel="Descuento de la línea"
                       onCambiar={(v) => setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, descuento: v } : x)))}
                     />
                     {l.descuento.trim().endsWith("%") && descAplicado > 0 && (
@@ -338,19 +338,19 @@ export default function VenderPage() {
           <dl className="space-y-1 text-sm">
             <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{fmtMoney(totales.subtotal)}</dd></div>
             <div className="flex items-center justify-between">
-              <dt className="text-muted">Descuento</dt>
-              <dd className="flex items-center gap-2">
-                <span className="text-accent">−{fmtMoney(totales.descuento)}</span>
+              <dt className="flex items-center gap-1.5 text-muted">
+                Descuento
                 <DescuentoPopover
                   valor=""
-                  etiqueta="Aplicar a toda la venta"
+                  ariaLabel="Descuento general (aplica a toda la venta)"
                   presets={presets}
                   onCambiar={(v) => {
                     if (!v || !lineas.length) return;
                     setLineas((ls) => ls.map((x) => ({ ...x, descuento: v })));
                   }}
                 />
-              </dd>
+              </dt>
+              <dd className="text-accent">−{fmtMoney(totales.descuento)}</dd>
             </div>
             <div className="flex justify-between"><dt className="text-muted">ITBMS</dt><dd>{fmtMoney(totales.itbms)}</dd></div>
             <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-bold">

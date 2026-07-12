@@ -51,7 +51,10 @@ const clienteDeGuion = (guion: Guion) => {
 };
 
 describe('AsistenteService.chat', () => {
-  const deps = { prisma: {} as never, productos: { buscar: jest.fn(async () => ({ datos: [] })) } as never };
+  const deps = {
+    prisma: { sucursal: { findUnique: jest.fn(async () => ({ codigo: '0001', nombre: 'Colón centro' })) } } as never,
+    productos: { buscar: jest.fn(async () => ({ datos: [] })) } as never,
+  };
 
   it('respuesta directa sin tool calls', async () => {
     const cliente = clienteDeGuion([() => ({ role: 'assistant', content: 'Hola, ¿en qué ayudo?' })]);

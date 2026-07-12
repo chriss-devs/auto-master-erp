@@ -39,8 +39,14 @@ describe('herramientasPara (filtrado RBAC — spec: el modelo no ve lo que no pu
   });
 });
 
+const sucursalesVisibles = [
+  { id: 'suc1', codigo: '0001', nombre: 'Colón centro' },
+  { id: 'suc2', codigo: '0002', nombre: 'Colón norte' },
+];
+const prismaSucursales = { sucursal: { findMany: jest.fn(async () => sucursalesVisibles) } };
+
 describe('ejecución con deps simuladas', () => {
-  it('buscar_producto mapea resultado compacto con url', async () => {
+  it('buscar_producto responde con UNA sola sucursal (la activa por defecto)', async () => {
     const h = HERRAMIENTAS.find((x) => x.nombre === 'buscar_producto')!;
     const productos = {
       buscar: jest.fn(async () => ({
@@ -48,17 +54,36 @@ describe('ejecución con deps simuladas', () => {
           id: 'p1', sku: 'ABC', nombre: 'Filtro aceite', precioBase: '8.50',
           marca: { nombre: 'FRAM' },
           stocks: [
-            { sucursalId: 'suc1', cantidad: { toString: () => '12' }, sucursal: { id: 'suc1', codigo: '0001', nombre: 'Colón centro' } },
-            { sucursalId: 'sucX', cantidad: { toString: () => '9' }, sucursal: { id: 'sucX', codigo: '0009', nombre: 'Otra empresa' } },
+            { sucursalId: 'suc1', cantidad: { toString: () => '12' } },
+            { sucursalId: 'suc2', cantidad: { toString: () => '9' } },
           ],
         }],
       })),
     };
-    const r: any = await h.ejecutar({ prisma: {} as any, productos: productos as any }, ctxCon(['productos:ver']), { q: 'filtro' });
+    const r: any = await h.ejecutar({ prisma: prismaSucursales as any, productos: productos as any }, ctxCon(['productos:ver']), { q: 'filtro' });
     expect(r.productos[0].url).toBe('/productos/p1');
     expect(r.productos[0].precio).toBe('8.50');
-    // Solo sucursales visibles del usuario (suc1, suc2) — sucX se excluye
-    expect(r.productos[0].stock).toEqual([{ sucursal: 'Colón centro', cantidad: '12' }]);
+    // Sucursal activa (suc1) por defecto, no una lista combinada de sucursales
+    expect(r.sucursal).toBe('Colón centro');
+    expect(r.productos[0].stock).toBe('12');
+  });
+
+  it('buscar_producto acepta pedir otra sucursal por código, sin combinarlas', async () => {
+    const h = HERRAMIENTAS.find((x) => x.nombre === 'buscar_producto')!;
+    const productos = {
+      buscar: jest.fn(async () => ({
+        datos: [{
+          id: 'p1', sku: 'ABC', nombre: 'Filtro aceite', precioBase: '8.50', marca: null,
+          stocks: [
+            { sucursalId: 'suc1', cantidad: { toString: () => '12' } },
+            { sucursalId: 'suc2', cantidad: { toString: () => '9' } },
+          ],
+        }],
+      })),
+    };
+    const r: any = await h.ejecutar({ prisma: prismaSucursales as any, productos: productos as any }, ctxCon(['productos:ver']), { q: 'filtro', sucursal: '0002' });
+    expect(r.sucursal).toBe('Colón norte');
+    expect(r.productos[0].stock).toBe('9');
   });
 
   it('ventas_del_dia rechaza fecha inválida con {error}', async () => {
@@ -67,17 +92,18 @@ describe('ejecución con deps simuladas', () => {
     expect(r.error).toMatch(/fecha/i);
   });
 
-  it('buscar_cliente con ventas:ver acota compras a las sucursales visibles (no cruza sucursal)', async () => {
+  it('buscar_cliente con ventas:ver acota compras a UNA sola sucursal (la activa, no cruza/combina)', async () => {
     const h = HERRAMIENTAS.find((x) => x.nombre === 'buscar_cliente')!;
     const ventaFindMany = jest.fn(async (_args: any) => [
       { numero: 'V-0001-0007', total: '25.00', cobradaEn: new Date('2026-07-01T15:00:00Z') },
     ]);
     const prisma = {
+      ...prismaSucursales,
       cliente: { findMany: jest.fn(async () => [{ id: 'c1', nombre: 'Juan', rucOCedula: '8-1', telefono: '60000000' }]) },
       venta: { findMany: ventaFindMany },
     };
     const r: any = await h.ejecutar({ prisma: prisma as any, productos: {} as any }, ctxCon(['clientes:ver', 'ventas:ver']), { q: 'Juan' });
-    // La consulta de compras DEBE filtrar por sucursalId ∈ sucursalIds del usuario
+    // La consulta de compras DEBE filtrar por UNA sola sucursalId (la activa), no una lista
     expect(ventaFindMany).toHaveBeenCalledTimes(1);
     expect(ventaFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -85,10 +111,11 @@ describe('ejecución con deps simuladas', () => {
           tenantId: 't1',
           clienteId: 'c1',
           estado: 'COBRADA',
-          sucursalId: { in: ['suc1', 'suc2'] },
+          sucursalId: 'suc1',
         }),
       }),
     );
+    expect(r.sucursal).toBe('Colón centro');
     expect(r.ultimasComprasDelPrimero[0].total).toBe('25.00');
   });
 
@@ -96,6 +123,7 @@ describe('ejecución con deps simuladas', () => {
     const h = HERRAMIENTAS.find((x) => x.nombre === 'buscar_cliente')!;
     const ventaFindMany = jest.fn();
     const prisma = {
+      ...prismaSucursales,
       cliente: { findMany: jest.fn(async () => [{ id: 'c1', nombre: 'Juan', rucOCedula: '8-1', telefono: '60000000' }]) },
       venta: { findMany: ventaFindMany },
     };

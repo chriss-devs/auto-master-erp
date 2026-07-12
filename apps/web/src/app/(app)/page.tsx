@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { Paginador, usePaginacion } from "@/components/paginacion";
 import { fmtFecha, fmtMoney, fmtQty } from "@/lib/format";
 import { useSesion } from "@/lib/session";
 import { Badge, Card, Spinner, Tabla, Td, Th, Vacio, cx } from "@/components/ui";
+
+interface FilaStockBajo {
+  producto: { id: string; sku: string; nombre: string; stockMinimo: string };
+  stocks: Array<{ sucursal: { id: string }; cantidad: string }>;
+}
 
 interface Resumen {
   hoy: {
@@ -58,6 +64,12 @@ export default function DashboardPage() {
       vigente = false;
     };
   }, [sucursalId]);
+
+  // Lista completa de "bajo mínimo" (paginada), en vez del top 8 recortado del resumen del dashboard
+  const pagBajo = usePaginacion<FilaStockBajo>(
+    `/inventario/stock?bajo_minimo=true${sucursalId ? `&sucursal=${sucursalId}` : ""}`,
+    sucursalId,
+  );
 
   if (error) return <Vacio texto={`No se pudo cargar el dashboard: ${error}`} />;
   if (!datos) return <Spinner />;
@@ -176,7 +188,9 @@ export default function DashboardPage() {
             </li>
             <li className="flex items-center justify-between">
               <Link href="/inventario?bajo=1" className="text-primary hover:underline">Productos bajo mínimo</Link>
-              <Badge tono={datos.inventario.stockBajo.length > 0 ? "rojo" : "gris"}>{datos.inventario.stockBajo.length}</Badge>
+              <Badge tono={(pagBajo.filas?.length ?? datos.inventario.stockBajo.length) > 0 ? "rojo" : "gris"}>
+                {pagBajo.filas?.length ?? datos.inventario.stockBajo.length}
+              </Badge>
             </li>
             <li className="flex items-center justify-between text-muted">
               <span>Inventario valorizado (costo)</span>
@@ -189,24 +203,34 @@ export default function DashboardPage() {
       {/* Fila 3: detalle accionable */}
       <div className="grid gap-3 lg:grid-cols-2">
         <Card titulo="Stock bajo mínimo — reponer">
-          {datos.inventario.stockBajo.length === 0 ? (
+          {!pagBajo.filas ? (
+            <Spinner />
+          ) : pagBajo.filas.length === 0 ? (
             <Vacio texto="Sin alertas de stock." />
           ) : (
-            <Tabla>
-              <thead>
-                <tr><Th>Código</Th><Th>Producto</Th><Th className="text-right">Stock</Th><Th className="text-right">Mínimo</Th></tr>
-              </thead>
-              <tbody>
-                {datos.inventario.stockBajo.map((p) => (
-                  <tr key={p.id}>
-                    <Td className="font-mono text-xs">{p.sku}</Td>
-                    <Td><Link className="text-primary hover:underline" href={`/productos/${p.id}`}>{p.nombre}</Link></Td>
-                    <Td className="text-right font-semibold text-danger">{fmtQty(p.cantidad)}</Td>
-                    <Td className="text-right text-muted">{fmtQty(p.stockMinimo)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Tabla>
+            <>
+              <Tabla>
+                <thead>
+                  <tr><Th>Código</Th><Th>Producto</Th><Th className="text-right">Stock</Th><Th className="text-right">Mínimo</Th></tr>
+                </thead>
+                <tbody>
+                  {pagBajo.filas.map((f) => {
+                    const cantidad = f.stocks.find((s) => s.sucursal.id === sucursalId)?.cantidad ?? "0";
+                    return (
+                      <tr key={f.producto.id}>
+                        <Td className="font-mono text-xs">{f.producto.sku}</Td>
+                        <Td><Link className="text-primary hover:underline" href={`/productos/${f.producto.id}`}>{f.producto.nombre}</Link></Td>
+                        <Td className="text-right font-semibold text-danger">{fmtQty(cantidad)}</Td>
+                        <Td className="text-right text-muted">{fmtQty(f.producto.stockMinimo)}</Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Tabla>
+              <div className="mt-2">
+                <Paginador p={pagBajo} nombre="producto(s) bajo mínimo" />
+              </div>
+            </>
           )}
         </Card>
 

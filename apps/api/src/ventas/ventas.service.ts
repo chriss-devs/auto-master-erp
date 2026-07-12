@@ -157,7 +157,10 @@ export class VentasService {
 
   async crear(ctx: Ctx, dto: CrearVentaDto) {
     if (dto.idempotencyKey) {
-      const existente = await this.prisma.venta.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: INCLUDE_VENTA });
+      // Aislamiento por tenant: la idempotencyKey es única global y la controla el cliente, así que
+      // un findUnique sin tenant devolvería la venta de OTRO tenant que reusara la misma clave (fuga
+      // cross-tenant). Se scopea con findFirst {idempotencyKey, tenantId} (SEC: aislamiento multiempresa).
+      const existente = await this.prisma.venta.findFirst({ where: { idempotencyKey: dto.idempotencyKey, tenantId: ctx.tenantId }, include: INCLUDE_VENTA });
       if (existente) return { venta: existente, advertencias: [], idempotente: true };
     }
     const sucursalId = dto.sucursalId ?? ctx.sucursalId;

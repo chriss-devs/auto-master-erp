@@ -101,6 +101,9 @@ export class ClientesController {
   async precioEspecial(@UsuarioActual() ctx: Ctx, @Param('id') clienteId: string, @Body() dto: PrecioEspecialDto) {
     const cliente = await this.prisma.cliente.findFirst({ where: { id: clienteId, tenantId: ctx.tenantId } });
     if (!cliente) throw err.noEncontrado('El cliente');
+    // El producto debe ser del mismo tenant (evita crear un precio especial que referencie un producto ajeno).
+    const producto = await this.prisma.producto.findFirst({ where: { id: dto.productoId, tenantId: ctx.tenantId }, select: { id: true } });
+    if (!producto) throw err.noEncontrado('El producto');
     const pe = await this.prisma.precioEspecial.upsert({
       where: { clienteId_productoId: { clienteId, productoId: dto.productoId } },
       update: { precio: dto.precio, activo: true },

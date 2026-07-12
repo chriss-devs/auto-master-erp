@@ -12,6 +12,23 @@ const servicio = (valorConfigurado: unknown) => {
   return new VentasService(prisma as never, {} as never, {} as never, {} as never, {} as never);
 };
 
+describe('VentasService.crear — idempotencia aislada por tenant (SEC: multiempresa)', () => {
+  it('el lookup de idempotencyKey filtra por tenantId y no usa findUnique global', async () => {
+    const findFirst = jest.fn(async () => ({ id: 'v-existente' }));
+    const findUnique = jest.fn();
+    const prisma = { venta: { findFirst, findUnique } };
+    const s = new VentasService(prisma as never, {} as never, {} as never, {} as never, {} as never);
+
+    const r = await s.crear(ctx, { lineas: [{ productoId: 'p1', cantidad: '1' }], idempotencyKey: 'key-de-otro-tenant' } as never);
+
+    expect(r.venta).toEqual({ id: 'v-existente' });
+    expect(findUnique).not.toHaveBeenCalled(); // nunca un lookup global sin tenant
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ idempotencyKey: 'key-de-otro-tenant', tenantId: 't1' }) }),
+    );
+  });
+});
+
 describe('VentasService.configDescuentos', () => {
   it('sin configuración guardada, devuelve el default [5, 10, 15, 20]', async () => {
     const s = servicio(undefined);

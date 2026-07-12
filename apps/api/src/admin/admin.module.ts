@@ -55,11 +55,19 @@ export class AdminController {
     }));
   }
 
+  /** Verifica que TODAS las sucursales indicadas existan y pertenezcan al tenant (aislamiento multiempresa). */
+  private async validarSucursalesDelTenant(tenantId: string, sucursalIds: string[]) {
+    const unicas = [...new Set(sucursalIds)];
+    const n = await this.prisma.sucursal.count({ where: { tenantId, id: { in: unicas } } });
+    if (n !== unicas.length) throw err.validacion('Alguna sucursal no existe o no pertenece a la empresa.');
+  }
+
   @Post('usuarios')
   @RequierePermiso('admin:usuarios')
   async crearUsuario(@UsuarioActual() ctx: Ctx, @Body() dto: CrearUsuarioDto) {
     const roles = await this.prisma.rol.findMany({ where: { tenantId: ctx.tenantId, codigo: { in: dto.roles } } });
     if (roles.length !== dto.roles.length) throw err.validacion('Alguno de los roles no existe.');
+    await this.validarSucursalesDelTenant(ctx.tenantId, dto.sucursales);
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const u = await this.prisma.usuario.create({
       data: {
@@ -105,6 +113,7 @@ export class AdminController {
         await tx.usuarioRol.createMany({ data: roles.map((r) => ({ usuarioId: id, rolId: r.id })) });
       }
       if (dto.sucursales) {
+        await this.validarSucursalesDelTenant(ctx.tenantId, dto.sucursales);
         await tx.usuarioSucursal.deleteMany({ where: { usuarioId: id } });
         await tx.usuarioSucursal.createMany({ data: dto.sucursales.map((s) => ({ usuarioId: id, sucursalId: s })) });
       }

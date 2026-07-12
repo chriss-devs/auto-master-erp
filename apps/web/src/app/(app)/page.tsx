@@ -69,6 +69,7 @@ export default function DashboardPage() {
   const pagBajo = usePaginacion<FilaStockBajo>(
     `/inventario/stock?bajo_minimo=true${sucursalId ? `&sucursal=${sucursalId}` : ""}`,
     sucursalId,
+    8,
   );
 
   if (error) return <Vacio texto={`No se pudo cargar el dashboard: ${error}`} />;
@@ -209,24 +210,26 @@ export default function DashboardPage() {
             <Vacio texto="Sin alertas de stock." />
           ) : (
             <>
-              <Tabla>
-                <thead>
-                  <tr><Th>Código</Th><Th>Producto</Th><Th className="text-right">Stock</Th><Th className="text-right">Mínimo</Th></tr>
-                </thead>
-                <tbody>
-                  {pagBajo.filas.map((f) => {
-                    const cantidad = f.stocks.find((s) => s.sucursal.id === sucursalId)?.cantidad ?? "0";
-                    return (
-                      <tr key={f.producto.id}>
-                        <Td className="font-mono text-xs">{f.producto.sku}</Td>
-                        <Td><Link className="text-primary hover:underline" href={`/productos/${f.producto.id}`}>{f.producto.nombre}</Link></Td>
-                        <Td className="text-right font-semibold text-danger">{fmtQty(cantidad)}</Td>
-                        <Td className="text-right text-muted">{fmtQty(f.producto.stockMinimo)}</Td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Tabla>
+              <div className="max-h-64 overflow-y-auto">
+                <Tabla>
+                  <thead>
+                    <tr><Th>Código</Th><Th>Producto</Th><Th className="text-right">Stock</Th><Th className="text-right">Mínimo</Th></tr>
+                  </thead>
+                  <tbody>
+                    {pagBajo.filas.map((f) => {
+                      const cantidad = f.stocks.find((s) => s.sucursal.id === sucursalId)?.cantidad ?? "0";
+                      return (
+                        <tr key={f.producto.id}>
+                          <Td className="font-mono text-xs">{f.producto.sku}</Td>
+                          <Td><Link className="text-primary hover:underline" href={`/productos/${f.producto.id}`}>{f.producto.nombre}</Link></Td>
+                          <Td className="text-right font-semibold text-danger">{fmtQty(cantidad)}</Td>
+                          <Td className="text-right text-muted">{fmtQty(f.producto.stockMinimo)}</Td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Tabla>
+              </div>
               <div className="mt-2">
                 <Paginador p={pagBajo} nombre="producto(s) bajo mínimo" />
               </div>

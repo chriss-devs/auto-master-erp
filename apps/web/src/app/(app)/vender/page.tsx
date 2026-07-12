@@ -3,9 +3,12 @@
 /** POS ventanilla — Paso 1 (D-020): el vendedor arma la venta y la envía a caja. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, nuevaIdempotencyKey } from "@/lib/api";
-import { fmtMoney, fmtQty } from "@/lib/format";
+import { fmtMoney, fmtQty, montoDescuento } from "@/lib/format";
 import { useSesion } from "@/lib/session";
+import { DescuentoPopover } from "@/components/descuento-popover";
 import { Badge, Button, Campo, Card, Dialogo, Input, Kbd, Tabla, Td, Th, Vacio, cx, useToast } from "@/components/ui";
+
+const PRESETS_DEFAULT = [5, 10, 15, 20];
 
 interface ProductoBusqueda {
   id: string;
@@ -31,18 +34,6 @@ interface Cliente {
   tipo: string;
 }
 
-/** Descuento por línea: acepta monto ("1.50") o porcentaje ("10%") del importe bruto. */
-function montoDescuento(raw: string, bruto: number): number {
-  const s = (raw ?? "").trim();
-  if (!s) return 0;
-  if (s.endsWith("%")) {
-    const p = Number(s.slice(0, -1).replace(",", "."));
-    return isFinite(p) && p > 0 ? Math.round(bruto * p) / 100 : 0;
-  }
-  const n = Number(s.replace(",", "."));
-  return isFinite(n) && n > 0 ? n : 0;
-}
-
 export default function VenderPage() {
   const { sucursalId } = useSesion();
   const { avisar } = useToast();
@@ -59,6 +50,14 @@ export default function VenderPage() {
   const [autUsuario, setAutUsuario] = useState("");
   const [autPassword, setAutPassword] = useState("");
   const [enPreparacion, setEnPreparacion] = useState<Array<{ id: string; total: string; creadoEn: string; cliente: { nombre: string } }>>([]);
+  const [presets, setPresets] = useState<number[]>(PRESETS_DEFAULT);
+
+  // Presets de descuento ajustables en Admin > Configuración; si falla, se usa el default local.
+  useEffect(() => {
+    api<{ presets: number[] }>("/ventas/config-descuentos")
+      .then((r) => r.presets?.length && setPresets(r.presets))
+      .catch(() => {});
+  }, []);
 
   // Búsqueda as-you-type con debounce (RNF-001, BL-012)
   useEffect(() => {
@@ -102,6 +101,32 @@ export default function VenderPage() {
     setQ("");
     setResultados([]);
     buscarRef.current?.focus();
+  };
+
+  /** Precio unitario efectivo (precio de lista − descuento vigente ÷ cantidad), para la columna "Precio". */
+  const precioEfectivo = (l: Linea): number => {
+    const cantidad = Number(l.cantidad || 0);
+    if (cantidad <= 0) return Number(l.producto.precioBase);
+    const bruto = Math.round(Number(l.producto.precioBase) * cantidad * 100) / 100;
+    const desc = Math.min(montoDescuento(l.descuento, bruto), bruto);
+    return (bruto - desc) / cantidad;
+  };
+
+  /** Precio editado a mano ⇒ se traduce a un descuento en monto equivalente (nunca sube del precio de lista). */
+  const cambiarPrecio = (i: number, precioNuevo: number) => {
+    if (!isFinite(precioNuevo)) return;
+    setLineas((ls) =>
+      ls.map((x, j) => {
+        if (j !== i) return x;
+        const cantidad = Number(x.cantidad || 0);
+        const precioLista = Number(x.producto.precioBase);
+        if (cantidad <= 0) return x;
+        const clamped = Math.min(Math.max(precioNuevo, 0), precioLista);
+        const bruto = Math.round(precioLista * cantidad * 100) / 100;
+        const descuentoMonto = Math.round((bruto - clamped * cantidad) * 100) / 100;
+        return { ...x, descuento: descuentoMonto > 0 ? descuentoMonto.toFixed(2) : "" };
+      }),
+    );
   };
 
   const totales = useMemo(() => {
@@ -249,7 +274,7 @@ export default function VenderPage() {
           <thead>
             <tr>
               <Th>Producto</Th><Th className="w-24 text-right">Cantidad</Th><Th className="w-28 text-right">Precio</Th>
-              <Th className="w-28 text-right">Desc. B/. ó %</Th><Th className="w-28 text-right">Importe</Th><Th className="w-10"> </Th>
+              <Th className="w-28 text-right">Descuento</Th><Th className="w-28 text-right">Importe</Th><Th className="w-10"> </Th>
             </tr>
           </thead>
           <tbody>
@@ -276,16 +301,15 @@ export default function VenderPage() {
                       }}
                     />
                   </Td>
-                  <Td className="text-right">{fmtMoney(l.producto.precioBase)}</Td>
                   <Td>
-                    <Input
-                      className="text-right"
-                      placeholder="0.00 ó 5%"
-                      value={l.descuento}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, descuento: v } : x)));
-                      }}
+                    <InputPrecio key={`${l.descuento}|${l.cantidad}`} valor={precioEfectivo(l)} onCommit={(n) => cambiarPrecio(i, n)} />
+                  </Td>
+                  <Td className="text-right">
+                    <DescuentoPopover
+                      valor={l.descuento}
+                      presets={presets}
+                      etiqueta="—"
+                      onCambiar={(v) => setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, descuento: v } : x)))}
                     />
                     {l.descuento.trim().endsWith("%") && descAplicado > 0 && (
                       <div className="mt-0.5 text-right text-[10px] text-muted">= {fmtMoney(descAplicado)}</div>
@@ -313,7 +337,21 @@ export default function VenderPage() {
         <Card titulo="Totales">
           <dl className="space-y-1 text-sm">
             <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{fmtMoney(totales.subtotal)}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted">Descuento</dt><dd className="text-accent">−{fmtMoney(totales.descuento)}</dd></div>
+            <div className="flex items-center justify-between">
+              <dt className="text-muted">Descuento</dt>
+              <dd className="flex items-center gap-2">
+                <span className="text-accent">−{fmtMoney(totales.descuento)}</span>
+                <DescuentoPopover
+                  valor=""
+                  etiqueta="Aplicar a toda la venta"
+                  presets={presets}
+                  onCambiar={(v) => {
+                    if (!v || !lineas.length) return;
+                    setLineas((ls) => ls.map((x) => ({ ...x, descuento: v })));
+                  }}
+                />
+              </dd>
+            </div>
             <div className="flex justify-between"><dt className="text-muted">ITBMS</dt><dd>{fmtMoney(totales.itbms)}</dd></div>
             <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-bold">
               <dt>Total</dt><dd className="text-primary">{fmtMoney(totales.total)}</dd>
@@ -432,4 +470,25 @@ function SelectorCliente({ cliente, onCliente }: { cliente: Cliente | null; onCl
 
 function Label_({ children }: { children: React.ReactNode }) {
   return <span className="mb-1 block text-xs font-medium text-muted">{children}</span>;
+}
+
+/**
+ * Precio unitario editable: texto local mientras se escribe, se confirma (y se traduce a
+ * descuento) al salir del campo. El padre lo remonta con una `key` cuando cantidad/descuento
+ * cambian por una causa externa (preset, edición de cantidad) — "resetear estado con key",
+ * en vez de sincronizar con un efecto.
+ */
+function InputPrecio({ valor, onCommit }: { valor: number; onCommit: (n: number) => void }) {
+  const [texto, setTexto] = useState(() => valor.toFixed(2));
+
+  return (
+    <Input
+      className="text-right"
+      inputMode="decimal"
+      value={texto}
+      onChange={(e) => setTexto(e.target.value)}
+      onBlur={() => onCommit(Number(texto.replace(",", ".")))}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+    />
+  );
 }

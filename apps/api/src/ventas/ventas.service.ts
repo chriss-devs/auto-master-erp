@@ -61,6 +61,18 @@ export class VentasService {
     return D(isFinite(v) ? v : 5);
   }
 
+  /** Presets de % de descuento configurables (Admin > Configuración) para los botones de la ventanilla. */
+  async configDescuentos(ctx: Ctx): Promise<{ presets: number[] }> {
+    const DEFAULT = [5, 10, 15, 20];
+    const cfg = await this.prisma.configuracion.findUnique({
+      where: { tenantId_clave: { tenantId: ctx.tenantId, clave: 'descuento_presets_pct' } },
+    });
+    const valor = cfg?.valor;
+    if (!Array.isArray(valor)) return { presets: DEFAULT };
+    const presets = valor.map(Number).filter((n) => isFinite(n) && n > 0 && n <= 100);
+    return { presets: presets.length ? presets : DEFAULT };
+  }
+
   /** Prepara líneas: precio especial por cliente (D-024), ITBMS por línea, advertencias de stock. */
   private async prepararLineas(ctx: Ctx, sucursalId: string, clienteId: string, lineasDto: LineaVentaDto[]): Promise<LineaPreparada[]> {
     const productoIds = [...new Set(lineasDto.map((l) => l.productoId))];

@@ -17,6 +17,13 @@ export class VentasController {
     return this.ventas.crear(ctx, { ...dto, idempotencyKey: dto.idempotencyKey ?? headerKey });
   }
 
+  /** Presets de % de descuento (Admin > Configuración) para los botones de la ventanilla. */
+  @Get('config-descuentos')
+  @RequierePermiso('ventas:crear')
+  configDescuentos(@UsuarioActual() ctx: Ctx) {
+    return this.ventas.configDescuentos(ctx);
+  }
+
   @Get()
   @RequierePermiso('ventas:ver')
   listar(

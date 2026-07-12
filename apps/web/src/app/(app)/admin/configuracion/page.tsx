@@ -9,11 +9,25 @@ interface Config {
   valores: Record<string, unknown>;
 }
 
-const EDITABLES: Array<{ clave: string; etiqueta: string; tipo: "numero" | "texto" }> = [
+const EDITABLES: Array<{ clave: string; etiqueta: string; tipo: "numero" | "texto" | "lista"; ayuda?: string }> = [
   { clave: "descuento_max_pct_sin_autorizacion", etiqueta: "Descuento máx. sin autorización (%) — RN-160", tipo: "numero" },
+  {
+    clave: "descuento_presets_pct",
+    etiqueta: "Presets de descuento en Vender (%)",
+    tipo: "lista",
+    ayuda: "Porcentajes separados por coma, ej. 5,10,15,20",
+  },
   { clave: "factura_papel", etiqueta: "Papel de impresión de factura (CARTA)", tipo: "texto" },
   { clave: "moneda_simbolo", etiqueta: "Símbolo de moneda", tipo: "texto" },
 ];
+
+/** "5, 10, 15" -> [5, 10, 15]; descarta valores no numéricos, ≤0 o >100. */
+function parsearListaPct(texto: string): number[] {
+  return texto
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => isFinite(n) && n > 0 && n <= 100);
+}
 
 export default function ConfiguracionPage() {
   const { avisar } = useToast();
@@ -25,7 +39,14 @@ export default function ConfiguracionPage() {
     api<Config>("/configuracion")
       .then((c) => {
         setCfg(c);
-        setValores(Object.fromEntries(EDITABLES.map((e) => [e.clave, String(c.valores[e.clave] ?? "")])));
+        setValores(
+          Object.fromEntries(
+            EDITABLES.map((e) => {
+              const v = c.valores[e.clave];
+              return [e.clave, e.tipo === "lista" && Array.isArray(v) ? v.join(",") : String(v ?? "")];
+            }),
+          ),
+        );
       })
       .catch(() => setCfg({ empresa: null, valores: {} }));
   }, []);
@@ -35,7 +56,9 @@ export default function ConfiguracionPage() {
     try {
       const cuerpo: Record<string, unknown> = {};
       for (const e of EDITABLES) {
-        cuerpo[e.clave] = e.tipo === "numero" ? Number(valores[e.clave] || 0) : valores[e.clave];
+        if (e.tipo === "numero") cuerpo[e.clave] = Number(valores[e.clave] || 0);
+        else if (e.tipo === "lista") cuerpo[e.clave] = parsearListaPct(valores[e.clave] ?? "");
+        else cuerpo[e.clave] = valores[e.clave];
       }
       await api("/configuracion", { metodo: "PATCH", cuerpo: { valores: cuerpo } });
       avisar("ok", "Configuración guardada (auditada).");
@@ -73,6 +96,7 @@ export default function ConfiguracionPage() {
             <Campo key={e.clave} etiqueta={e.etiqueta}>
               <Input
                 inputMode={e.tipo === "numero" ? "decimal" : undefined}
+                placeholder={e.ayuda}
                 value={valores[e.clave] ?? ""}
                 onChange={(ev) => setValores((v) => ({ ...v, [e.clave]: ev.target.value }))}
               />

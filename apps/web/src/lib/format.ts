@@ -23,3 +23,15 @@ export const fmtFecha = (v: string | Date | null | undefined, conHora = true): s
 };
 
 export const pct = (tasa: string | number): string => `${(Number(tasa) * 100).toFixed(Number(tasa) * 100 % 1 === 0 ? 0 : 2)}%`;
+
+/** Descuento de línea de venta: acepta monto ("1.50") o porcentaje ("10%") del importe bruto. */
+export function montoDescuento(raw: string, bruto: number): number {
+  const s = (raw ?? "").trim();
+  if (!s) return 0;
+  if (s.endsWith("%")) {
+    const p = Number(s.slice(0, -1).replace(",", "."));
+    return isFinite(p) && p > 0 ? Math.round(bruto * p) / 100 : 0;
+  }
+  const n = Number(s.replace(",", "."));
+  return isFinite(n) && n > 0 ? n : 0;
+}

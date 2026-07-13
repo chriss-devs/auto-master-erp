@@ -172,17 +172,33 @@ export function Dialogo({
 
   if (!abierto) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[8vh]" onMouseDown={forzado ? undefined : onCerrar}>
-      <div ref={ref} className={cx("w-full rounded-lg bg-surface p-4 shadow-xl", ancho)} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-start sm:p-4 sm:pt-[8vh]"
+      onMouseDown={forzado ? undefined : onCerrar}
+    >
+      <div
+        ref={ref}
+        className={cx(
+          "flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-lg bg-surface shadow-xl sm:max-h-[85vh] sm:rounded-lg",
+          ancho,
+        )}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-border p-4 sm:border-0 sm:pb-0">
           <h2 className="text-base font-semibold">{titulo}</h2>
           {!forzado && (
-            <button data-cerrar onClick={onCerrar} tabIndex={-1} className="rounded p-1 text-muted hover:bg-page" aria-label="Cerrar">
+            <button
+              data-cerrar
+              onClick={onCerrar}
+              tabIndex={-1}
+              className="flex h-9 w-9 items-center justify-center rounded p-1 text-muted hover:bg-page"
+              aria-label="Cerrar"
+            >
               ✕
             </button>
           )}
         </div>
-        {children}
+        <div className="overflow-y-auto p-4 sm:pt-3">{children}</div>
       </div>
     </div>
   );

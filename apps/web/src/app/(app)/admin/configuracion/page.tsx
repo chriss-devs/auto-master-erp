@@ -77,7 +77,7 @@ export default function ConfiguracionPage() {
 
       <Card titulo="Empresa (datos fiscales del emisor)">
         {cfg.empresa ? (
-          <dl className="grid grid-cols-2 gap-2 text-sm">
+          <dl className="grid grid-cols-1 gap-x-2 gap-y-1 text-sm sm:grid-cols-2">
             <dt className="text-muted">Nombre</dt><dd>{cfg.empresa.nombre}</dd>
             <dt className="text-muted">Razón social</dt><dd>{cfg.empresa.razonSocial ?? "—"}</dd>
             <dt className="text-muted">RUC / DV</dt><dd>{cfg.empresa.ruc ?? "—"} {cfg.empresa.dv ? `DV ${cfg.empresa.dv}` : ""}</dd>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { fmtFecha } from "@/lib/format";
 import { useSesion } from "@/lib/session";
-import { Badge, Button, Campo, Dialogo, Input, Spinner, Tabla, Td, Th, useToast } from "@/components/ui";
+import { Badge, Button, Campo, Dialogo, Input, Spinner, TablaResponsive, Td, Th, useToast } from "@/components/ui";
 
 interface Usuario {
   id: string;
@@ -44,27 +44,42 @@ export default function UsuariosPage() {
         <Button onClick={() => setEditando("nuevo")}>+ Usuario</Button>
       </div>
 
-      <Tabla>
-        <thead>
-          <tr><Th>Usuario</Th><Th>Nombre</Th><Th>Roles</Th><Th>Sucursales</Th><Th>Último acceso</Th><Th>Estado</Th><Th className="w-16"> </Th></tr>
-        </thead>
-        <tbody>
-          {filas.map((u) => (
-            <tr key={u.id} className="hover:bg-page">
-              <Td className="font-mono text-xs">{u.usuario}</Td>
-              <Td className="font-medium">{u.nombre}</Td>
-              <Td className="text-xs">{u.roles.map((r) => r.nombre).join(", ")}</Td>
-              <Td className="text-xs">{u.sucursales.map((s) => s.codigo).join(", ")}</Td>
-              <Td className="text-xs text-muted">{fmtFecha(u.ultimoLoginEn)}</Td>
-              <Td>
+      <TablaResponsive
+        filas={filas}
+        claveFila={(u) => u.id}
+        vacio="Sin usuarios."
+        encabezado={<><Th>Usuario</Th><Th>Nombre</Th><Th>Roles</Th><Th>Sucursales</Th><Th>Último acceso</Th><Th>Estado</Th><Th className="w-16"> </Th></>}
+        renderFila={(u) => (
+          <>
+            <Td className="font-mono text-xs">{u.usuario}</Td>
+            <Td className="font-medium">{u.nombre}</Td>
+            <Td className="text-xs">{u.roles.map((r) => r.nombre).join(", ")}</Td>
+            <Td className="text-xs">{u.sucursales.map((s) => s.codigo).join(", ")}</Td>
+            <Td className="text-xs text-muted">{fmtFecha(u.ultimoLoginEn)}</Td>
+            <Td>
+              {u.activo ? <Badge tono="verde">Activo</Badge> : <Badge tono="rojo">Inactivo</Badge>}
+              {u.debeCambiarClave && <Badge tono="ambar" className="ml-1">clave temporal</Badge>}
+            </Td>
+            <Td><button className="text-primary hover:underline" onClick={() => setEditando(u)}>editar</button></Td>
+          </>
+        )}
+        renderTarjeta={(u) => (
+          <button className="block w-full text-left" onClick={() => setEditando(u)}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-mono text-xs text-muted">{u.usuario}</div>
+                <div className="font-medium">{u.nombre}</div>
+                <div className="mt-0.5 text-xs text-muted">{u.roles.map((r) => r.nombre).join(", ") || "sin roles"}</div>
+                <div className="text-xs text-muted">Sucursales: {u.sucursales.map((s) => s.codigo).join(", ") || "—"}</div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
                 {u.activo ? <Badge tono="verde">Activo</Badge> : <Badge tono="rojo">Inactivo</Badge>}
-                {u.debeCambiarClave && <Badge tono="ambar" className="ml-1">clave temporal</Badge>}
-              </Td>
-              <Td><button className="text-primary hover:underline" onClick={() => setEditando(u)}>editar</button></Td>
-            </tr>
-          ))}
-        </tbody>
-      </Tabla>
+                {u.debeCambiarClave && <Badge tono="ambar">clave temporal</Badge>}
+              </div>
+            </div>
+          </button>
+        )}
+      />
 
       {editando && (
         <UsuarioDialog

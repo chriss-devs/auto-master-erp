@@ -429,7 +429,7 @@ export default function VenderPage() {
         </Card>
       </div>
 
-      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-border bg-surface p-3 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] xl:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-surface p-3 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] xl:hidden">
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="text-muted">Total ({lineas.length} línea{lineas.length === 1 ? "" : "s"})</span>
           <span className="text-lg font-bold text-primary">{fmtMoney(totales.total)}</span>

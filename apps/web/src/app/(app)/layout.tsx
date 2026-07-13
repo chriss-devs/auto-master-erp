@@ -7,21 +7,39 @@ import { api, ApiError } from "@/lib/api";
 import { SesionProvider, useSesion } from "@/lib/session";
 import { Button, Campo, Dialogo, Input, Kbd, Select, Spinner, ToastProvider, useToast, cx } from "@/components/ui";
 import { AsistenteWidget } from "@/components/asistente";
+import {
+  faGaugeHigh,
+  faCashRegister,
+  faCalculator,
+  faBoxOpen,
+  faWarehouse,
+  faUsers,
+  faTruck,
+  faFileInvoice,
+  faUserGear,
+  faShieldHalved,
+  faClipboardList,
+  faGear,
+} from "@fortawesome/free-solid-svg-icons";
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { BarraInferior, BotonMenu, DrawerMenu, type ItemNav } from "@/components/nav-movil";
 
-const NAV: Array<{ ruta: string; texto: string; permiso: string; tecla?: string }> = [
-  { ruta: "/", texto: "Dashboard", permiso: "reportes:ver", tecla: "F1" },
-  { ruta: "/vender", texto: "Vender", permiso: "ventas:crear", tecla: "F2" },
-  { ruta: "/caja", texto: "Caja", permiso: "caja:operar", tecla: "F3" },
-  { ruta: "/productos", texto: "Productos", permiso: "productos:ver", tecla: "F4" },
-  { ruta: "/inventario", texto: "Inventario", permiso: "inventario:ver", tecla: "F6" },
-  { ruta: "/clientes", texto: "Clientes", permiso: "clientes:ver" },
-  { ruta: "/proveedores", texto: "Proveedores", permiso: "proveedores:ver" },
-  { ruta: "/facturas", texto: "Facturas", permiso: "facturacion:ver" },
-  { ruta: "/admin/usuarios", texto: "Usuarios", permiso: "admin:usuarios" },
-  { ruta: "/admin/roles", texto: "Roles", permiso: "admin:roles" },
-  { ruta: "/admin/auditoria", texto: "Auditoría", permiso: "auditoria:ver" },
-  { ruta: "/admin/configuracion", texto: "Configuración", permiso: "admin:config" },
+const NAV: Array<{ ruta: string; texto: string; permiso: string; tecla?: string; icono: IconDefinition }> = [
+  { ruta: "/", texto: "Dashboard", permiso: "reportes:ver", tecla: "F1", icono: faGaugeHigh },
+  { ruta: "/vender", texto: "Vender", permiso: "ventas:crear", tecla: "F2", icono: faCashRegister },
+  { ruta: "/caja", texto: "Caja", permiso: "caja:operar", tecla: "F3", icono: faCalculator },
+  { ruta: "/productos", texto: "Productos", permiso: "productos:ver", tecla: "F4", icono: faBoxOpen },
+  { ruta: "/inventario", texto: "Inventario", permiso: "inventario:ver", tecla: "F6", icono: faWarehouse },
+  { ruta: "/clientes", texto: "Clientes", permiso: "clientes:ver", icono: faUsers },
+  { ruta: "/proveedores", texto: "Proveedores", permiso: "proveedores:ver", icono: faTruck },
+  { ruta: "/facturas", texto: "Facturas", permiso: "facturacion:ver", icono: faFileInvoice },
+  { ruta: "/admin/usuarios", texto: "Usuarios", permiso: "admin:usuarios", icono: faUserGear },
+  { ruta: "/admin/roles", texto: "Roles", permiso: "admin:roles", icono: faShieldHalved },
+  { ruta: "/admin/auditoria", texto: "Auditoría", permiso: "auditoria:ver", icono: faClipboardList },
+  { ruta: "/admin/configuracion", texto: "Configuración", permiso: "admin:config", icono: faGear },
 ];
+
+const RUTAS_BARRA_INFERIOR = ["/", "/vender", "/caja", "/productos", "/inventario"];
 
 function CambiarClave({ forzado, onListo }: { forzado: boolean; onListo: () => void }) {
   const { avisar } = useToast();
@@ -69,6 +87,10 @@ function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [cambiandoClave, setCambiandoClave] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const itemsVisibles: ItemNav[] = NAV.filter((n) => puede(n.permiso));
+  const itemsBarra = itemsVisibles.filter((n) => RUTAS_BARRA_INFERIOR.includes(n.ruta));
+  const esActivo = (ruta: string) => (ruta === "/" ? pathname === "/" : pathname.startsWith(ruta));
 
   // Atajos globales de teclado (11 §4.2, D-033)
   useEffect(() => {
@@ -98,8 +120,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden print:h-auto print:overflow-visible">
-      <aside className="no-print flex h-full w-52 shrink-0 flex-col border-r border-border bg-surface">
+    <div className="flex h-dvh overflow-hidden print:h-auto print:overflow-visible">
+      <aside className="no-print hidden h-full w-52 shrink-0 flex-col border-r border-border bg-surface lg:flex">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-white">AM</div>
           <div className="leading-tight">
@@ -134,12 +156,15 @@ function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex h-full min-w-0 flex-1 flex-col print:h-auto">
-        <header className="no-print flex shrink-0 items-center justify-between border-b border-border bg-surface px-4 py-2">
-          <div className="text-sm text-muted">B/. — moneda local (PAB)</div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted">Sucursal:</span>
+        <header className="no-print flex shrink-0 flex-col gap-2 border-b border-border bg-surface px-3 py-2 lg:flex-row lg:items-center lg:justify-between lg:px-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 lg:hidden">
+              <BotonMenu onAbrir={() => setMenuAbierto(true)} />
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-black text-white">AM</div>
+            </div>
+            <div className="hidden text-sm text-muted lg:block">B/. — moneda local (PAB)</div>
             <Select
-              className="w-56"
+              className="w-44 sm:w-56 lg:w-56"
               value={sucursalId ?? ""}
               onChange={(e) => void cambiarSucursal(e.target.value)}
             >
@@ -151,8 +176,20 @@ function Shell({ children }: { children: React.ReactNode }) {
             </Select>
           </div>
         </header>
-        <main className="min-w-0 flex-1 overflow-y-auto p-4 print:overflow-visible">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto p-3 pb-20 print:overflow-visible sm:p-4 lg:pb-4">{children}</main>
       </div>
+
+      <BarraInferior items={itemsBarra} activo={esActivo} />
+      <DrawerMenu
+        abierto={menuAbierto}
+        onCerrar={() => setMenuAbierto(false)}
+        items={itemsVisibles}
+        activo={esActivo}
+        usuario={me.usuario.nombre}
+        roles={me.roles.join(", ")}
+        onCambiarClave={() => setCambiandoClave(true)}
+        onSalir={() => void salir()}
+      />
 
       {(me.usuario.debeCambiarClave || cambiandoClave) && (
         <CambiarClave

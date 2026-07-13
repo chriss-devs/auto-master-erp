@@ -379,36 +379,36 @@ export default function VenderPage() {
       </div>
 
       <div className="space-y-3 xl:space-y-3">
-        <div className="hidden xl:block">
-          <Card titulo="Totales">
-            <dl className="space-y-1 text-sm">
-              <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{fmtMoney(totales.subtotal)}</dd></div>
-              <div className="flex items-center justify-between">
-                <dt className="flex items-center gap-1.5 text-muted">
-                  Descuento
-                  <DescuentoPopover
-                    valor=""
-                    ariaLabel="Descuento general (aplica a toda la venta)"
-                    presets={presets}
-                    onCambiar={(v) => {
-                      if (!v || !lineas.length) return;
-                      setLineas((ls) => ls.map((x) => ({ ...x, descuento: v })));
-                    }}
-                  />
-                </dt>
-                <dd className="text-accent">−{fmtMoney(totales.descuento)}</dd>
-              </div>
-              <div className="flex justify-between"><dt className="text-muted">ITBMS</dt><dd>{fmtMoney(totales.itbms)}</dd></div>
-              <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-bold">
-                <dt>Total</dt><dd className="text-primary">{fmtMoney(totales.total)}</dd>
-              </div>
-            </dl>
+        <Card titulo="Totales">
+          <dl className="space-y-1 text-sm">
+            <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{fmtMoney(totales.subtotal)}</dd></div>
+            <div className="flex items-center justify-between">
+              <dt className="flex items-center gap-1.5 text-muted">
+                Descuento
+                <DescuentoPopover
+                  valor=""
+                  ariaLabel="Descuento general (aplica a toda la venta)"
+                  presets={presets}
+                  onCambiar={(v) => {
+                    if (!v || !lineas.length) return;
+                    setLineas((ls) => ls.map((x) => ({ ...x, descuento: v })));
+                  }}
+                />
+              </dt>
+              <dd className="text-accent">−{fmtMoney(totales.descuento)}</dd>
+            </div>
+            <div className="flex justify-between"><dt className="text-muted">ITBMS</dt><dd>{fmtMoney(totales.itbms)}</dd></div>
+            <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-bold">
+              <dt>Total</dt><dd className="text-primary">{fmtMoney(totales.total)}</dd>
+            </div>
+          </dl>
+          <div className="hidden xl:block">
             <Button className="mt-3 w-full py-2.5 text-base" disabled={enviando || lineas.length === 0} onClick={() => void enviar()}>
               {enviando ? "Enviando…" : "Enviar a caja (F9)"}
             </Button>
-            <p className="mt-2 text-center text-xs text-muted">La caja cobra, factura y entrega (D-020).</p>
-          </Card>
-        </div>
+          </div>
+          <p className="mt-2 text-center text-xs text-muted">La caja cobra, factura y entrega (D-020).</p>
+        </Card>
 
         <Card titulo="En preparación (esta sucursal)">
           {enPreparacion.length === 0 ? (

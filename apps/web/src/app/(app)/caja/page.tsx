@@ -174,7 +174,7 @@ export default function CajaPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 text-sm md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
         {METODOS.map((m) => (
           <Card key={m} className="py-3">
             <div className="text-xs text-muted">{m === "ACH" ? "Transferencia/ACH" : m.charAt(0) + m.slice(1).toLowerCase()}</div>
@@ -187,7 +187,7 @@ export default function CajaPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+      <div className="grid gap-4 pb-24 lg:grid-cols-[340px_1fr] lg:pb-0">
         <Card titulo="Ventas en preparación">
           {prep.length === 0 ? (
             <Vacio texto="Nada pendiente de cobro." />
@@ -253,13 +253,13 @@ export default function CajaPage() {
                   </Button>
                 </div>
                 {pagos.map((p, i) => (
-                  <div key={i} className="grid grid-cols-[130px_1fr_1fr_32px] items-center gap-2">
-                    <Select value={p.metodo} onChange={(e) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, metodo: e.target.value as Metodo } : x)))}>
+                  <div key={i} className="grid grid-cols-2 items-end gap-2 border-b border-border pb-2 last:border-0 last:pb-0 sm:grid-cols-[130px_1fr_1fr_32px] sm:items-center sm:border-0 sm:pb-0">
+                    <Select className="col-span-2 sm:col-span-1" value={p.metodo} onChange={(e) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, metodo: e.target.value as Metodo } : x)))}>
                       {METODOS.map((m) => <option key={m} value={m}>{m === "ACH" ? "ACH/Transf." : m.charAt(0) + m.slice(1).toLowerCase()}</option>)}
                     </Select>
                     <Input inputMode="decimal" placeholder="Monto" value={p.monto} onChange={(e) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, monto: e.target.value } : x)))} />
                     <Input placeholder={p.metodo === "TARJETA" ? "Voucher datáfono" : p.metodo === "EFECTIVO" ? "—" : "Referencia"} disabled={p.metodo === "EFECTIVO"} value={p.referencia} onChange={(e) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, referencia: e.target.value } : x)))} />
-                    <button className="text-danger" onClick={() => setPagos((ps) => ps.filter((_, j) => j !== i))} disabled={pagos.length === 1}>✕</button>
+                    <button className="flex h-11 w-11 items-center justify-center text-danger sm:h-auto sm:w-auto" onClick={() => setPagos((ps) => ps.filter((_, j) => j !== i))} disabled={pagos.length === 1}>✕</button>
                   </div>
                 ))}
                 <div className={cx("text-right text-sm font-medium", Math.abs(faltante) < 0.005 ? "text-success" : "text-danger")}>
@@ -279,13 +279,23 @@ export default function CajaPage() {
                 )}
               </div>
 
-              <Button className="w-full py-2.5 text-base" disabled={cobrando || Math.abs(faltante) >= 0.005} onClick={() => void cobrar()}>
-                {cobrando ? "Cobrando…" : "Cobrar y facturar"} <Kbd>F9</Kbd>
-              </Button>
+              <div className="hidden lg:block">
+                <Button className="w-full py-2.5 text-base" disabled={cobrando || Math.abs(faltante) >= 0.005} onClick={() => void cobrar()}>
+                  {cobrando ? "Cobrando…" : "Cobrar y facturar"} <Kbd>F9</Kbd>
+                </Button>
+              </div>
             </div>
           )}
         </Card>
       </div>
+
+      {venta && (
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-surface p-3 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] lg:hidden">
+          <Button className="w-full py-2.5 text-base" disabled={cobrando || Math.abs(faltante) >= 0.005} onClick={() => void cobrar()}>
+            {cobrando ? "Cobrando…" : "Cobrar y facturar"} <Kbd>F9</Kbd>
+          </Button>
+        </div>
+      )}
 
       {resultado && <ResultadoCobro r={resultado} onCerrar={() => setResultado(null)} />}
       <MovimientoCaja abierto={movAbierto} onCerrar={() => { setMovAbierto(false); cargar(); }} />

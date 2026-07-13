@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { Paginador, usePaginacion } from "@/components/paginacion";
 import { fmtFecha, fmtMoney, fmtQty } from "@/lib/format";
 import { useSesion } from "@/lib/session";
-import { Badge, Card, Spinner, Tabla, Td, Th, Vacio, cx } from "@/components/ui";
+import { Badge, Card, Spinner, TablaResponsive, Td, Th, Vacio, cx } from "@/components/ui";
 
 interface FilaStockBajo {
   producto: { id: string; sku: string; nombre: string; stockMinimo: string };
@@ -211,24 +211,37 @@ export default function DashboardPage() {
           ) : (
             <>
               <div className="max-h-64 overflow-y-auto">
-                <Tabla>
-                  <thead>
-                    <tr><Th>Código</Th><Th>Producto</Th><Th className="text-right">Stock</Th><Th className="text-right">Mínimo</Th></tr>
-                  </thead>
-                  <tbody>
-                    {pagBajo.filas.map((f) => {
-                      const cantidad = f.stocks.find((s) => s.sucursal.id === sucursalId)?.cantidad ?? "0";
-                      return (
-                        <tr key={f.producto.id}>
-                          <Td className="font-mono text-xs">{f.producto.sku}</Td>
-                          <Td><Link className="text-primary hover:underline" href={`/productos/${f.producto.id}`}>{f.producto.nombre}</Link></Td>
-                          <Td className="text-right font-semibold text-danger">{fmtQty(cantidad)}</Td>
-                          <Td className="text-right text-muted">{fmtQty(f.producto.stockMinimo)}</Td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </Tabla>
+                <TablaResponsive
+                  filas={pagBajo.filas}
+                  claveFila={(f) => f.producto.id}
+                  encabezado={<><Th>Código</Th><Th>Producto</Th><Th className="text-right">Stock</Th><Th className="text-right">Mínimo</Th></>}
+                  renderFila={(f) => {
+                    const cantidad = f.stocks.find((s) => s.sucursal.id === sucursalId)?.cantidad ?? "0";
+                    return (
+                      <>
+                        <Td className="font-mono text-xs">{f.producto.sku}</Td>
+                        <Td><Link className="text-primary hover:underline" href={`/productos/${f.producto.id}`}>{f.producto.nombre}</Link></Td>
+                        <Td className="text-right font-semibold text-danger">{fmtQty(cantidad)}</Td>
+                        <Td className="text-right text-muted">{fmtQty(f.producto.stockMinimo)}</Td>
+                      </>
+                    );
+                  }}
+                  renderTarjeta={(f) => {
+                    const cantidad = f.stocks.find((s) => s.sucursal.id === sucursalId)?.cantidad ?? "0";
+                    return (
+                      <Link href={`/productos/${f.producto.id}`} className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-mono text-xs text-muted">{f.producto.sku}</div>
+                          <div className="text-primary">{f.producto.nombre}</div>
+                        </div>
+                        <div className="shrink-0 text-right text-sm">
+                          <div className="font-semibold text-danger">{fmtQty(cantidad)}</div>
+                          <div className="text-xs text-muted">mín. {fmtQty(f.producto.stockMinimo)}</div>
+                        </div>
+                      </Link>
+                    );
+                  }}
+                />
               </div>
               <div className="mt-2">
                 <Paginador p={pagBajo} nombre="producto(s) bajo mínimo" />
@@ -241,21 +254,28 @@ export default function DashboardPage() {
           {datos.topProductos7d.length === 0 ? (
             <Vacio texto="Aún no hay ventas registradas." />
           ) : (
-            <Tabla>
-              <thead>
-                <tr><Th>Producto</Th><Th className="text-right">Unid.</Th><Th className="text-right">Vendido</Th><Th className="text-right">Utilidad</Th></tr>
-              </thead>
-              <tbody>
-                {datos.topProductos7d.map((t) => (
-                  <tr key={t.productoId}>
-                    <Td>{t.descripcion}</Td>
-                    <Td className="text-right">{fmtQty(t.unidades)}</Td>
-                    <Td className="text-right font-medium">{fmtMoney(t.importe)}</Td>
-                    <Td className="text-right font-medium text-success">{fmtMoney(t.utilidad)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Tabla>
+            <TablaResponsive
+              filas={datos.topProductos7d}
+              claveFila={(t) => t.productoId}
+              encabezado={<><Th>Producto</Th><Th className="text-right">Unid.</Th><Th className="text-right">Vendido</Th><Th className="text-right">Utilidad</Th></>}
+              renderFila={(t) => (
+                <>
+                  <Td>{t.descripcion}</Td>
+                  <Td className="text-right">{fmtQty(t.unidades)}</Td>
+                  <Td className="text-right font-medium">{fmtMoney(t.importe)}</Td>
+                  <Td className="text-right font-medium text-success">{fmtMoney(t.utilidad)}</Td>
+                </>
+              )}
+              renderTarjeta={(t) => (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 truncate">{t.descripcion}</div>
+                  <div className="shrink-0 text-right text-sm">
+                    <div>{fmtQty(t.unidades)} unid. · {fmtMoney(t.importe)}</div>
+                    <div className="font-medium text-success">+{fmtMoney(t.utilidad)}</div>
+                  </div>
+                </div>
+              )}
+            />
           )}
         </Card>
       </div>

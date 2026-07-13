@@ -81,7 +81,7 @@ export default function RolesPage() {
               <li key={r.id}>
                 <button
                   onClick={() => seleccionar(r)}
-                  className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${sel === r.id ? "bg-primary-light font-semibold text-primary-dark" : "hover:bg-page"}`}
+                  className={`flex min-h-[44px] w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${sel === r.id ? "bg-primary-light font-semibold text-primary-dark" : "hover:bg-page"}`}
                 >
                   {r.nombre}
                   <span className="text-xs text-muted">{r.usuarios} usr</span>
@@ -107,9 +107,10 @@ export default function RolesPage() {
                 <div key={recurso} className="rounded border border-border p-2">
                   <h4 className="mb-1 text-xs font-bold uppercase text-muted">{recurso}</h4>
                   {ps.map((p) => (
-                    <label key={p.codigo} className="flex items-center gap-2 py-0.5 text-sm" title={p.descripcion}>
+                    <label key={p.codigo} className="flex min-h-[36px] items-center gap-2 text-sm" title={p.descripcion}>
                       <input
                         type="checkbox"
+                        className="h-4 w-4 shrink-0"
                         disabled={rol.codigo === "admin_general"}
                         checked={marcados.has(p.codigo)}
                         onChange={() => {

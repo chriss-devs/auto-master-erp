@@ -32,6 +32,15 @@ function InventarioContenido() {
   const [soloBajo, setSoloBajo] = useState(params.get("bajo") === "1");
   const [ajuste, setAjuste] = useState<FilaStock | null>(null);
   const [kardex, setKardex] = useState<{ producto: FilaStock["producto"]; movs: Mov[] } | null>(null);
+  const [expandido, setExpandido] = useState<Set<string>>(new Set());
+  const toggleExpandido = (id: string) => {
+    setExpandido((s) => {
+      const c = new Set(s);
+      if (c.has(id)) c.delete(id);
+      else c.add(id);
+      return c;
+    });
+  };
 
   // Paginación por cursor compartida (components/paginacion) para 10k+ productos
   const qs = new URLSearchParams();
@@ -66,44 +75,90 @@ function InventarioContenido() {
       ) : filas.length === 0 ? (
         <Vacio texto="Sin resultados." />
       ) : (
-        <Tabla>
-          <thead>
-            <tr>
-              <Th>Código</Th><Th>Producto</Th>
-              {sucursales.map((s) => <Th key={s.id} className="text-right">{s.codigo} {s.nombre}</Th>)}
-              <Th className="text-right">Mínimo</Th><Th className="w-44"> </Th>
-            </tr>
-          </thead>
-          <tbody>
+        <>
+          <div className="space-y-2 md:hidden">
             {filas.map((f) => {
               const total = f.stocks.reduce((a, s) => a + Number(s.cantidad), 0);
               const bajo = Number(f.producto.stockMinimo) > 0 && total <= Number(f.producto.stockMinimo);
+              const stActiva = f.stocks.find((s) => s.sucursal.id === sucursalId);
+              const otras = sucursales.filter((s) => s.id !== sucursalId);
+              const abierto = expandido.has(f.producto.id);
               return (
-                <tr key={f.producto.id} className="hover:bg-page">
-                  <Td className="font-mono text-xs">{f.producto.sku}</Td>
-                  <Td>
-                    {f.producto.nombre} {bajo && <Badge tono="rojo" className="ml-1">bajo</Badge>}
-                  </Td>
-                  {sucursales.map((s) => {
-                    const st = f.stocks.find((x) => x.sucursal.id === s.id);
-                    return (
-                      <Td key={s.id} className="text-right">
-                        {fmtQty(st?.cantidad ?? 0)} <span className="text-xs text-muted">@ {fmtMoney(st?.costoPromedio ?? 0)}</span>
-                      </Td>
-                    );
-                  })}
-                  <Td className="text-right text-muted">{fmtQty(f.producto.stockMinimo)}</Td>
-                  <Td className="text-right">
-                    <button className="mr-3 text-primary hover:underline" onClick={() => void verKardex(f.producto)}>kardex</button>
+                <div key={f.producto.id} className="rounded-lg border border-border bg-surface p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-mono text-xs text-muted">{f.producto.sku}</div>
+                      <div className="font-medium">{f.producto.nombre} {bajo && <Badge tono="rojo" className="ml-1">bajo</Badge>}</div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-lg font-bold">{fmtQty(stActiva?.cantidad ?? 0)}</div>
+                      <div className="text-xs text-muted">mín. {fmtQty(f.producto.stockMinimo)}</div>
+                    </div>
+                  </div>
+                  {otras.length > 0 && (
+                    <button className="mt-1 text-xs text-primary hover:underline" onClick={() => toggleExpandido(f.producto.id)}>
+                      {abierto ? "ocultar otras sucursales" : "ver otras sucursales"}
+                    </button>
+                  )}
+                  {abierto && (
+                    <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-muted">
+                      {otras.map((s) => {
+                        const st = f.stocks.find((x) => x.sucursal.id === s.id);
+                        return <div key={s.id}>{s.codigo}: <span className="text-ink">{fmtQty(st?.cantidad ?? 0)}</span></div>;
+                      })}
+                    </div>
+                  )}
+                  <div className="mt-2 flex items-center gap-3 border-t border-border pt-2 text-sm">
+                    <button className="min-h-[44px] px-1 text-primary hover:underline" onClick={() => void verKardex(f.producto)}>kardex</button>
                     {puede("inventario:ajustar") && (
-                      <button className="text-primary hover:underline" onClick={() => setAjuste(f)}>ajustar</button>
+                      <button className="min-h-[44px] px-1 text-primary hover:underline" onClick={() => setAjuste(f)}>ajustar</button>
                     )}
-                  </Td>
-                </tr>
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </Tabla>
+          </div>
+          <div className="hidden md:block">
+            <Tabla>
+              <thead>
+                <tr>
+                  <Th>Código</Th><Th>Producto</Th>
+                  {sucursales.map((s) => <Th key={s.id} className="text-right">{s.codigo} {s.nombre}</Th>)}
+                  <Th className="text-right">Mínimo</Th><Th className="w-44"> </Th>
+                </tr>
+              </thead>
+              <tbody>
+                {filas.map((f) => {
+                  const total = f.stocks.reduce((a, s) => a + Number(s.cantidad), 0);
+                  const bajo = Number(f.producto.stockMinimo) > 0 && total <= Number(f.producto.stockMinimo);
+                  return (
+                    <tr key={f.producto.id} className="hover:bg-page">
+                      <Td className="font-mono text-xs">{f.producto.sku}</Td>
+                      <Td>
+                        {f.producto.nombre} {bajo && <Badge tono="rojo" className="ml-1">bajo</Badge>}
+                      </Td>
+                      {sucursales.map((s) => {
+                        const st = f.stocks.find((x) => x.sucursal.id === s.id);
+                        return (
+                          <Td key={s.id} className="text-right">
+                            {fmtQty(st?.cantidad ?? 0)} <span className="text-xs text-muted">@ {fmtMoney(st?.costoPromedio ?? 0)}</span>
+                          </Td>
+                        );
+                      })}
+                      <Td className="text-right text-muted">{fmtQty(f.producto.stockMinimo)}</Td>
+                      <Td className="text-right">
+                        <button className="mr-3 text-primary hover:underline" onClick={() => void verKardex(f.producto)}>kardex</button>
+                        {puede("inventario:ajustar") && (
+                          <button className="text-primary hover:underline" onClick={() => setAjuste(f)}>ajustar</button>
+                        )}
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Tabla>
+          </div>
+        </>
       )}
 
       <Paginador p={pag} nombre="producto(s)" />

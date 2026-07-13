@@ -23,7 +23,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0",
         VARIANTES[variante],
         className,
       )}
@@ -37,7 +37,7 @@ export function Input({ className, ...props }: React.ComponentProps<"input">) {
   return (
     <input
       className={cx(
-        "w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-sm placeholder:text-muted disabled:bg-page",
+        "w-full rounded-md border border-border bg-white px-2.5 py-2 text-base placeholder:text-muted disabled:bg-page sm:py-1.5 sm:text-sm",
         className,
       )}
       {...props}
@@ -48,7 +48,7 @@ export function Input({ className, ...props }: React.ComponentProps<"input">) {
 export function Select({ className, children, ...props }: React.ComponentProps<"select">) {
   return (
     <select
-      className={cx("w-full rounded-md border border-border bg-white px-2 py-1.5 text-sm", className)}
+      className={cx("w-full rounded-md border border-border bg-white px-2 py-2 text-base sm:py-1.5 sm:text-sm", className)}
       {...props}
     >
       {children}

@@ -21,6 +21,7 @@
 
 html,
 body {
+  overflow-x: hidden;
   background: var(--color-page);
   color: var(--color-ink);
   font-family:

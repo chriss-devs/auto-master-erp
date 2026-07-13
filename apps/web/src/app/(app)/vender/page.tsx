@@ -214,7 +214,7 @@ export default function VenderPage() {
   }, [lineas, cliente, notas, sucursalId]);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
+    <div className="grid gap-4 pb-40 xl:grid-cols-[1fr_300px] xl:pb-0">
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold">Vender — armar venta</h1>
@@ -247,7 +247,7 @@ export default function VenderPage() {
                     key={p.id}
                     onMouseEnter={() => setSel(i)}
                     onClick={() => agregar(p)}
-                    className={cx("flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm", i === sel ? "bg-primary-light" : "hover:bg-page")}
+                    className={cx("flex min-h-[52px] w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm", i === sel ? "bg-primary-light" : "hover:bg-page")}
                   >
                     <span className="min-w-0">
                       <span className="mr-2 font-mono text-xs text-muted">{p.sku}</span>
@@ -270,60 +270,105 @@ export default function VenderPage() {
           )}
         </div>
 
-        <Tabla>
-          <thead>
-            <tr>
-              <Th>Producto</Th><Th className="w-24 text-right">Cantidad</Th><Th className="w-28 text-right">Precio</Th>
-              <Th className="w-28 text-right">Descuento</Th><Th className="w-28 text-right">Importe</Th><Th className="w-10"> </Th>
-            </tr>
-          </thead>
-          <tbody>
-            {lineas.length === 0 && (
-              <tr><Td colSpan={6}><Vacio texto="Busque un producto y presione Enter para agregarlo." /></Td></tr>
-            )}
-            {lineas.map((l, i) => {
-              const bruto = Math.round(Number(l.producto.precioBase) * Number(l.cantidad || 0) * 100) / 100;
-              const descAplicado = Math.min(montoDescuento(l.descuento, bruto), bruto);
-              return (
-                <tr key={l.producto.id}>
-                  <Td>
-                    <div className="font-medium">{l.producto.nombre}</div>
-                    <div className="font-mono text-xs text-muted">{l.producto.sku} · {l.producto.unidadMedida.codigo}</div>
-                  </Td>
-                  <Td>
-                    <Input
-                      className="text-right"
-                      inputMode="decimal"
-                      value={l.cantidad}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, cantidad: v } : x)));
-                      }}
-                    />
-                  </Td>
-                  <Td>
-                    <InputPrecio key={`${l.descuento}|${l.cantidad}`} valor={precioEfectivo(l)} onCommit={(n) => cambiarPrecio(i, n)} />
-                  </Td>
-                  <Td className="text-right">
-                    <DescuentoPopover
-                      valor={l.descuento}
-                      presets={presets}
-                      ariaLabel="Descuento de la línea"
-                      onCambiar={(v) => setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, descuento: v } : x)))}
-                    />
-                    {l.descuento.trim().endsWith("%") && descAplicado > 0 && (
-                      <div className="mt-0.5 text-right text-[10px] text-muted">= {fmtMoney(descAplicado)}</div>
-                    )}
-                  </Td>
-                  <Td className="text-right font-medium">{fmtMoney(bruto - descAplicado)}</Td>
-                  <Td>
-                    <button className="text-danger hover:underline" onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))}>✕</button>
-                  </Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Tabla>
+        {lineas.length === 0 ? (
+          <div className="rounded-lg border border-border bg-surface"><Vacio texto="Busque un producto y presione Enter para agregarlo." /></div>
+        ) : (
+          <>
+            <div className="space-y-2 md:hidden">
+              {lineas.map((l, i) => {
+                const bruto = Math.round(Number(l.producto.precioBase) * Number(l.cantidad || 0) * 100) / 100;
+                const descAplicado = Math.min(montoDescuento(l.descuento, bruto), bruto);
+                return (
+                  <div key={l.producto.id} className="rounded-lg border border-border bg-surface p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium">{l.producto.nombre}</div>
+                        <div className="font-mono text-xs text-muted">{l.producto.sku} · {l.producto.unidadMedida.codigo}</div>
+                      </div>
+                      <button className="flex h-9 w-9 shrink-0 items-center justify-center text-danger" onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))} aria-label="Quitar línea">✕</button>
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <Campo etiqueta="Cantidad">
+                        <Input className="text-right" inputMode="decimal" value={l.cantidad} onChange={(e) => {
+                          const v = e.target.value;
+                          setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, cantidad: v } : x)));
+                        }} />
+                      </Campo>
+                      <Campo etiqueta="Precio">
+                        <InputPrecio key={`${l.descuento}|${l.cantidad}`} valor={precioEfectivo(l)} onCommit={(n) => cambiarPrecio(i, n)} />
+                      </Campo>
+                      <Campo etiqueta="Descuento">
+                        <DescuentoPopover
+                          valor={l.descuento}
+                          presets={presets}
+                          ariaLabel="Descuento de la línea"
+                          onCambiar={(v) => setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, descuento: v } : x)))}
+                        />
+                      </Campo>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-sm">
+                      <span className="text-muted">Importe</span>
+                      <span className="font-semibold">{fmtMoney(bruto - descAplicado)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="hidden md:block">
+              <Tabla>
+                <thead>
+                  <tr>
+                    <Th>Producto</Th><Th className="w-24 text-right">Cantidad</Th><Th className="w-28 text-right">Precio</Th>
+                    <Th className="w-28 text-right">Descuento</Th><Th className="w-28 text-right">Importe</Th><Th className="w-10"> </Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineas.map((l, i) => {
+                    const bruto = Math.round(Number(l.producto.precioBase) * Number(l.cantidad || 0) * 100) / 100;
+                    const descAplicado = Math.min(montoDescuento(l.descuento, bruto), bruto);
+                    return (
+                      <tr key={l.producto.id}>
+                        <Td>
+                          <div className="font-medium">{l.producto.nombre}</div>
+                          <div className="font-mono text-xs text-muted">{l.producto.sku} · {l.producto.unidadMedida.codigo}</div>
+                        </Td>
+                        <Td>
+                          <Input
+                            className="text-right"
+                            inputMode="decimal"
+                            value={l.cantidad}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, cantidad: v } : x)));
+                            }}
+                          />
+                        </Td>
+                        <Td>
+                          <InputPrecio key={`${l.descuento}|${l.cantidad}`} valor={precioEfectivo(l)} onCommit={(n) => cambiarPrecio(i, n)} />
+                        </Td>
+                        <Td className="text-right">
+                          <DescuentoPopover
+                            valor={l.descuento}
+                            presets={presets}
+                            ariaLabel="Descuento de la línea"
+                            onCambiar={(v) => setLineas((ls) => ls.map((x, j) => (j === i ? { ...x, descuento: v } : x)))}
+                          />
+                          {l.descuento.trim().endsWith("%") && descAplicado > 0 && (
+                            <div className="mt-0.5 text-right text-[10px] text-muted">= {fmtMoney(descAplicado)}</div>
+                          )}
+                        </Td>
+                        <Td className="text-right font-medium">{fmtMoney(bruto - descAplicado)}</Td>
+                        <Td>
+                          <button className="text-danger hover:underline" onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))}>✕</button>
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Tabla>
+            </div>
+          </>
+        )}
 
         <div className="grid gap-3 md:grid-cols-2">
           <SelectorCliente cliente={cliente} onCliente={setCliente} />
@@ -333,35 +378,37 @@ export default function VenderPage() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        <Card titulo="Totales">
-          <dl className="space-y-1 text-sm">
-            <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{fmtMoney(totales.subtotal)}</dd></div>
-            <div className="flex items-center justify-between">
-              <dt className="flex items-center gap-1.5 text-muted">
-                Descuento
-                <DescuentoPopover
-                  valor=""
-                  ariaLabel="Descuento general (aplica a toda la venta)"
-                  presets={presets}
-                  onCambiar={(v) => {
-                    if (!v || !lineas.length) return;
-                    setLineas((ls) => ls.map((x) => ({ ...x, descuento: v })));
-                  }}
-                />
-              </dt>
-              <dd className="text-accent">−{fmtMoney(totales.descuento)}</dd>
-            </div>
-            <div className="flex justify-between"><dt className="text-muted">ITBMS</dt><dd>{fmtMoney(totales.itbms)}</dd></div>
-            <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-bold">
-              <dt>Total</dt><dd className="text-primary">{fmtMoney(totales.total)}</dd>
-            </div>
-          </dl>
-          <Button className="mt-3 w-full py-2.5 text-base" disabled={enviando || lineas.length === 0} onClick={() => void enviar()}>
-            {enviando ? "Enviando…" : "Enviar a caja (F9)"}
-          </Button>
-          <p className="mt-2 text-center text-xs text-muted">La caja cobra, factura y entrega (D-020).</p>
-        </Card>
+      <div className="space-y-3 xl:space-y-3">
+        <div className="hidden xl:block">
+          <Card titulo="Totales">
+            <dl className="space-y-1 text-sm">
+              <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{fmtMoney(totales.subtotal)}</dd></div>
+              <div className="flex items-center justify-between">
+                <dt className="flex items-center gap-1.5 text-muted">
+                  Descuento
+                  <DescuentoPopover
+                    valor=""
+                    ariaLabel="Descuento general (aplica a toda la venta)"
+                    presets={presets}
+                    onCambiar={(v) => {
+                      if (!v || !lineas.length) return;
+                      setLineas((ls) => ls.map((x) => ({ ...x, descuento: v })));
+                    }}
+                  />
+                </dt>
+                <dd className="text-accent">−{fmtMoney(totales.descuento)}</dd>
+              </div>
+              <div className="flex justify-between"><dt className="text-muted">ITBMS</dt><dd>{fmtMoney(totales.itbms)}</dd></div>
+              <div className="mt-2 flex justify-between border-t border-border pt-2 text-lg font-bold">
+                <dt>Total</dt><dd className="text-primary">{fmtMoney(totales.total)}</dd>
+              </div>
+            </dl>
+            <Button className="mt-3 w-full py-2.5 text-base" disabled={enviando || lineas.length === 0} onClick={() => void enviar()}>
+              {enviando ? "Enviando…" : "Enviar a caja (F9)"}
+            </Button>
+            <p className="mt-2 text-center text-xs text-muted">La caja cobra, factura y entrega (D-020).</p>
+          </Card>
+        </div>
 
         <Card titulo="En preparación (esta sucursal)">
           {enPreparacion.length === 0 ? (
@@ -373,13 +420,23 @@ export default function VenderPage() {
                   <span className="min-w-0 truncate">{v.cliente.nombre}</span>
                   <span className="flex shrink-0 items-center gap-2">
                     <span className="font-medium">{fmtMoney(v.total)}</span>
-                    <button className="text-xs text-danger hover:underline" onClick={() => void cancelarPreparacion(v.id)}>cancelar</button>
+                    <button className="min-h-[44px] px-1 text-xs text-danger hover:underline" onClick={() => void cancelarPreparacion(v.id)}>cancelar</button>
                   </span>
                 </li>
               ))}
             </ul>
           )}
         </Card>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-border bg-surface p-3 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] xl:hidden">
+        <div className="mb-2 flex items-center justify-between text-sm">
+          <span className="text-muted">Total ({lineas.length} línea{lineas.length === 1 ? "" : "s"})</span>
+          <span className="text-lg font-bold text-primary">{fmtMoney(totales.total)}</span>
+        </div>
+        <Button className="w-full py-2.5 text-base" disabled={enviando || lineas.length === 0} onClick={() => void enviar()}>
+          {enviando ? "Enviando…" : "Enviar a caja (F9)"}
+        </Button>
       </div>
 
       <Dialogo abierto={pedirAutorizacion} onCerrar={() => setPedirAutorizacion(false)} titulo="Autorización de descuento (RN-160)">

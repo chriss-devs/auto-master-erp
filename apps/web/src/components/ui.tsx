@@ -124,6 +124,50 @@ export function Td({ children, className, colSpan }: { children?: React.ReactNod
   return <td colSpan={colSpan} className={cx("border-b border-border/60 px-3 py-1.5 align-middle", className)}>{children}</td>;
 }
 
+// ── Tabla responsive (tarjetas en móvil, tabla desde md) ───────────────────────
+export function TablaResponsive<T>({
+  filas,
+  claveFila,
+  encabezado,
+  renderFila,
+  renderTarjeta,
+  vacio = "Sin resultados.",
+}: {
+  filas: T[];
+  claveFila: (fila: T) => string;
+  encabezado: React.ReactNode;
+  renderFila: (fila: T) => React.ReactNode;
+  renderTarjeta: (fila: T) => React.ReactNode;
+  vacio?: string;
+}) {
+  if (filas.length === 0) return <Vacio texto={vacio} />;
+  return (
+    <>
+      <div className="space-y-2 md:hidden">
+        {filas.map((f) => (
+          <div key={claveFila(f)} className="rounded-lg border border-border bg-surface p-3 shadow-sm">
+            {renderTarjeta(f)}
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block">
+        <Tabla>
+          <thead>
+            <tr>{encabezado}</tr>
+          </thead>
+          <tbody>
+            {filas.map((f) => (
+              <tr key={claveFila(f)} className="hover:bg-page">
+                {renderFila(f)}
+              </tr>
+            ))}
+          </tbody>
+        </Tabla>
+      </div>
+    </>
+  );
+}
+
 // ── Spinner / vacío ───────────────────────────────────────────────────────────
 export function Spinner({ texto = "Cargando…" }: { texto?: string }) {
   return (

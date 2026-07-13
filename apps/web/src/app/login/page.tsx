@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { api, ApiError } from "@/lib/api";
 import { Button, Campo, Input } from "@/components/ui";
 
@@ -9,6 +11,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -42,7 +45,25 @@ export default function LoginPage() {
             <Input autoFocus autoComplete="username" value={usuario} onChange={(e) => setUsuario(e.target.value)} required />
           </Campo>
           <Campo etiqueta="Contraseña">
-            <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <div className="relative">
+              <Input
+                type={mostrarPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarPassword((v) => !v)}
+                className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted hover:text-ink"
+                tabIndex={-1}
+                aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                <FontAwesomeIcon icon={mostrarPassword ? faEyeSlash : faEye} className="text-sm" />
+              </button>
+            </div>
           </Campo>
           {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-danger">{error}</p>}
           <Button type="submit" className="w-full" disabled={cargando}>

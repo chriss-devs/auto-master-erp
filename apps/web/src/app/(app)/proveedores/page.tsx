@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSesion } from "@/lib/session";
 import { Paginador, usePaginacion } from "@/components/paginacion";
-import { Button, Campo, Dialogo, Input, Spinner, Tabla, Td, Th, Vacio, useToast } from "@/components/ui";
+import { Button, Campo, Dialogo, Input, Spinner, TablaResponsive, Td, Th, useToast } from "@/components/ui";
 
 interface Proveedor {
   id: string;
@@ -33,28 +33,41 @@ export default function ProveedoresPage() {
 
       {!filas ? (
         <Spinner />
-      ) : filas.length === 0 ? (
-        <Vacio texto="Sin proveedores." />
       ) : (
         <>
-        <Tabla>
-          <thead><tr><Th>Nombre</Th><Th>RUC</Th><Th>Teléfono</Th><Th>Correo</Th><Th className="w-20"> </Th></tr></thead>
-          <tbody>
-            {filas.map((p) => (
-              <tr key={p.id} className="hover:bg-page">
-                <Td className="font-medium">{p.nombre}</Td>
-                <Td className="font-mono text-xs">{p.ruc ?? "—"}</Td>
-                <Td>{p.telefono ?? "—"}</Td>
-                <Td>{p.email ?? "—"}</Td>
-                <Td>
-                  {puede("proveedores:gestionar") && (
-                    <button className="text-primary hover:underline" onClick={() => setEditando(p)}>editar</button>
-                  )}
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tabla>
+        <TablaResponsive
+          filas={filas}
+          claveFila={(p) => p.id}
+          vacio="Sin proveedores."
+          encabezado={<><Th>Nombre</Th><Th>RUC</Th><Th>Teléfono</Th><Th>Correo</Th><Th className="w-20"> </Th></>}
+          renderFila={(p) => (
+            <>
+              <Td className="font-medium">{p.nombre}</Td>
+              <Td className="font-mono text-xs">{p.ruc ?? "—"}</Td>
+              <Td>{p.telefono ?? "—"}</Td>
+              <Td>{p.email ?? "—"}</Td>
+              <Td>
+                {puede("proveedores:gestionar") && (
+                  <button className="text-primary hover:underline" onClick={() => setEditando(p)}>editar</button>
+                )}
+              </Td>
+            </>
+          )}
+          renderTarjeta={(p) => (
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-medium">{p.nombre}</div>
+                <div className="mt-1 text-xs text-muted">
+                  {p.ruc ?? "sin RUC"} · {p.telefono ?? "sin teléfono"}
+                </div>
+                {p.email && <div className="text-xs text-muted">{p.email}</div>}
+              </div>
+              {puede("proveedores:gestionar") && (
+                <button className="min-h-[44px] shrink-0 px-2 text-sm text-primary hover:underline" onClick={() => setEditando(p)}>editar</button>
+              )}
+            </div>
+          )}
+        />
         <Paginador p={pag} nombre="proveedor(es)" />
         </>
       )}

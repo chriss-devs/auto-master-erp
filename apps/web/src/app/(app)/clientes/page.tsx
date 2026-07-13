@@ -5,7 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { fmtMoney } from "@/lib/format";
 import { useSesion } from "@/lib/session";
 import { Paginador, usePaginacion } from "@/components/paginacion";
-import { Badge, Button, Campo, Dialogo, Input, Select, Spinner, Tabla, Td, Th, Vacio, useToast } from "@/components/ui";
+import { Badge, Button, Campo, Dialogo, Input, Select, Spinner, Tabla, TablaResponsive, Td, Th, Vacio, useToast } from "@/components/ui";
 
 interface Cliente {
   id: string;
@@ -49,27 +49,45 @@ export default function ClientesPage() {
         <Spinner />
       ) : (
         <>
-        <Tabla>
-          <thead>
-            <tr><Th>Nombre</Th><Th>Tipo</Th><Th>RUC/Cédula</Th><Th>Teléfono</Th><Th className="w-40"> </Th></tr>
-          </thead>
-          <tbody>
-            {filas.map((c) => (
-              <tr key={c.id} className="hover:bg-page">
-                <Td className="font-medium">{c.nombre}</Td>
-                <Td>{c.tipo === "CONSUMIDOR_FINAL" ? <Badge tono="azul">Consumidor final</Badge> : c.tipo === "JURIDICO" ? "Jurídico" : "Natural"}</Td>
-                <Td className="font-mono text-xs">{c.rucOCedula ?? "—"}{c.dv ? ` DV ${c.dv}` : ""}</Td>
-                <Td>{c.telefono ?? "—"}</Td>
-                <Td className="text-right">
-                  <button className="mr-3 text-primary hover:underline" onClick={() => verDetalle(c)}>precios</button>
-                  {puede("clientes:gestionar") && c.tipo !== "CONSUMIDOR_FINAL" && (
-                    <button className="text-primary hover:underline" onClick={() => setEditando(c)}>editar</button>
-                  )}
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tabla>
+        <TablaResponsive
+          filas={filas}
+          claveFila={(c) => c.id}
+          vacio="Sin clientes."
+          encabezado={<><Th>Nombre</Th><Th>Tipo</Th><Th>RUC/Cédula</Th><Th>Teléfono</Th><Th className="w-40"> </Th></>}
+          renderFila={(c) => (
+            <>
+              <Td className="font-medium">{c.nombre}</Td>
+              <Td>{c.tipo === "CONSUMIDOR_FINAL" ? <Badge tono="azul">Consumidor final</Badge> : c.tipo === "JURIDICO" ? "Jurídico" : "Natural"}</Td>
+              <Td className="font-mono text-xs">{c.rucOCedula ?? "—"}{c.dv ? ` DV ${c.dv}` : ""}</Td>
+              <Td>{c.telefono ?? "—"}</Td>
+              <Td className="text-right">
+                <button className="mr-3 text-primary hover:underline" onClick={() => verDetalle(c)}>precios</button>
+                {puede("clientes:gestionar") && c.tipo !== "CONSUMIDOR_FINAL" && (
+                  <button className="text-primary hover:underline" onClick={() => setEditando(c)}>editar</button>
+                )}
+              </Td>
+            </>
+          )}
+          renderTarjeta={(c) => (
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-medium">{c.nombre}</div>
+                <div className="mt-0.5">
+                  {c.tipo === "CONSUMIDOR_FINAL" ? <Badge tono="azul">Consumidor final</Badge> : <span className="text-xs text-muted">{c.tipo === "JURIDICO" ? "Jurídico" : "Natural"}</span>}
+                </div>
+                <div className="mt-1 text-xs text-muted">
+                  {c.rucOCedula ? `${c.rucOCedula}${c.dv ? ` DV ${c.dv}` : ""}` : "Sin RUC/cédula"} · {c.telefono ?? "sin teléfono"}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1 text-sm">
+                <button className="min-h-[44px] px-2 text-primary hover:underline" onClick={() => verDetalle(c)}>precios</button>
+                {puede("clientes:gestionar") && c.tipo !== "CONSUMIDOR_FINAL" && (
+                  <button className="min-h-[44px] px-2 text-primary hover:underline" onClick={() => setEditando(c)}>editar</button>
+                )}
+              </div>
+            </div>
+          )}
+        />
         <Paginador p={pag} nombre="cliente(s)" />
         </>
       )}
